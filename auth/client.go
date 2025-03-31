@@ -214,29 +214,9 @@ func (c *Client) newRequest(ctx context.Context, method, path string, body inter
 
 // do sends an API request and returns the API response
 func (c *Client) do(req *http.Request, v interface{}) (*http.Response, error) {
-	// Add debug information for troubleshooting
-	fmt.Printf("DEBUG: Making %s request to %s\n", req.Method, req.URL.String())
-	
-	// Print request headers for debugging
-	fmt.Println("DEBUG: Request Headers:")
-	for key, values := range req.Header {
-		fmt.Printf("DEBUG:   %s: %s\n", key, values)
-	}
-	
-	// Print request body if available
-	if req.Body != nil {
-		// Create a copy of the body so we can read it and still send it
-		buf, _ := io.ReadAll(req.Body)
-		req.Body.Close()
-		fmt.Printf("DEBUG: Request Body: %s\n", string(buf))
-		// Reset the body with a new ReadCloser
-		req.Body = io.NopCloser(bytes.NewBuffer(buf))
-	}
-	
 	// Send the request
 	resp, err := c.HTTPClient.Do(req)
 	if err != nil {
-		fmt.Printf("DEBUG: Network error: %v\n", err)
 		// Handle network-level errors
 		if urlErr, ok := err.(*url.Error); ok {
 			if urlErr.Timeout() {
@@ -258,16 +238,8 @@ func (c *Client) do(req *http.Request, v interface{}) (*http.Response, error) {
 	}
 	defer resp.Body.Close()
 	
-	// Print response info
-	fmt.Printf("DEBUG: Response Status: %s\n", resp.Status)
-	fmt.Println("DEBUG: Response Headers:")
-	for key, values := range resp.Header {
-		fmt.Printf("DEBUG:   %s: %s\n", key, values)
-	}
-	
-	// Copy the response body for debugging
+	// Read the response body
 	bodyBytes, _ := io.ReadAll(resp.Body)
-	fmt.Printf("DEBUG: Response Body: %s\n", string(bodyBytes))
 	// Reset the body with a new ReadCloser for further processing
 	resp.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
 
@@ -319,7 +291,6 @@ func (c *Client) do(req *http.Request, v interface{}) (*http.Response, error) {
 		// We already have the body bytes, decode from there
 		err = json.Unmarshal(bodyBytes, v)
 		if err != nil {
-			fmt.Printf("DEBUG: Failed to parse response JSON: %v\n", err)
 			return nil, &ErrorResponse{
 				ErrorCode:   "parse_error",
 				Description: fmt.Sprintf("Failed to parse the successful response: %v", err),
@@ -485,7 +456,12 @@ func (c *Client) ConfirmPasswordReset(ctx context.Context, email, code, newPassw
 	return err
 }
 
-// GetUserProfile retrieves the profile of the currently authenticated user
+// GetUserProfile retrieves the profile of the currently authenticated user.
+// 
+// Note: The caller is responsible for adding the appropriate "Authorization: Bearer <token>" header
+// to the request before calling this method. This can be done by passing a token directly 
+// to this method or by configuring the HTTP client passed via WithHTTPClient with a transport 
+// that injects the token automatically.
 func (c *Client) GetUserProfile(ctx context.Context, accessToken string) (*UserProfileResponse, error) {
 	req, err := c.newRequest(ctx, "GET", "/auth/me", nil)
 	if err != nil {
