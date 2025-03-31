@@ -121,13 +121,12 @@ func TestHealth(t *testing.T) {
 }
 
 func TestGetClientCredentialsToken(t *testing.T) {
-	// Create a test server
 	server, client := setupTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "POST" {
 			t.Errorf("Expected POST request, got %s", r.Method)
 		}
-		if r.URL.Path != "/auth/token" {
-			t.Errorf("Expected /auth/token path, got %s", r.URL.Path)
+		if r.URL.Path != "/oauth2/token" {
+			t.Errorf("Expected /oauth2/token path, got %s", r.URL.Path)
 		}
 
 		// Verify request body
@@ -306,8 +305,8 @@ func TestRequestPasswordReset(t *testing.T) {
 		if r.Method != "POST" {
 			t.Errorf("Expected POST request, got %s", r.Method)
 		}
-		if r.URL.Path != "/auth/password/reset" {
-			t.Errorf("Expected /auth/password/reset path, got %s", r.URL.Path)
+		if r.URL.Path != "/auth/forgot-password" {
+			t.Errorf("Expected /auth/forgot-password path, got %s", r.URL.Path)
 		}
 
 		// Verify request body
@@ -336,15 +335,15 @@ func TestRequestPasswordReset(t *testing.T) {
 		t.Fatalf("RequestPasswordReset() error = %v", err)
 	}
 	if response.CodeDeliveryDetails.Destination != "t***@example.com" {
-		t.Errorf("response.CodeDeliveryDetails.Destination = %v, want %v", 
+		t.Errorf("response.CodeDeliveryDetails.Destination = %v, want %v",
 			response.CodeDeliveryDetails.Destination, "t***@example.com")
 	}
 	if response.CodeDeliveryDetails.DeliveryMedium != "EMAIL" {
-		t.Errorf("response.CodeDeliveryDetails.DeliveryMedium = %v, want %v", 
+		t.Errorf("response.CodeDeliveryDetails.DeliveryMedium = %v, want %v",
 			response.CodeDeliveryDetails.DeliveryMedium, "EMAIL")
 	}
 	if response.CodeDeliveryDetails.AttributeName != "email" {
-		t.Errorf("response.CodeDeliveryDetails.AttributeName = %v, want %v", 
+		t.Errorf("response.CodeDeliveryDetails.AttributeName = %v, want %v",
 			response.CodeDeliveryDetails.AttributeName, "email")
 	}
 }
@@ -354,8 +353,8 @@ func TestConfirmPasswordReset(t *testing.T) {
 		if r.Method != "POST" {
 			t.Errorf("Expected POST request, got %s", r.Method)
 		}
-		if r.URL.Path != "/auth/password/confirm" {
-			t.Errorf("Expected /auth/password/confirm path, got %s", r.URL.Path)
+		if r.URL.Path != "/auth/confirm-forgot-password" {
+			t.Errorf("Expected /auth/confirm-forgot-password path, got %s", r.URL.Path)
 		}
 
 		// Verify request body
@@ -422,20 +421,20 @@ func TestErrorHandling(t *testing.T) {
 
 func TestInvalidURLError(t *testing.T) {
 	client, _ := NewClient("https://invalid.example.com")
-	
+
 	// Create a server that never responds
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Intentionally empty to force timeout
 	}))
 	server.Close() // Close server immediately to force connection error
-	
+
 	// Set invalid URL
 	parsedURL, _ := url.Parse(server.URL)
 	client.BaseURL = parsedURL
-	
+
 	// Set very short timeout to ensure fast test
 	client.HTTPClient = &http.Client{Timeout: 10 * time.Millisecond}
-	
+
 	_, err := client.Health(context.Background())
 	if err == nil {
 		t.Fatal("Expected error but got nil")
@@ -444,11 +443,11 @@ func TestInvalidURLError(t *testing.T) {
 
 func TestClient_GetUserProfile(t *testing.T) {
 	cases := []struct {
-		name           string
-		accessToken    string
-		responseStatus int
-		responseBody   string
-		expectedError  bool
+		name            string
+		accessToken     string
+		responseStatus  int
+		responseBody    string
+		expectedError   bool
 		expectedProfile *UserProfileResponse
 	}{
 		{
@@ -466,19 +465,19 @@ func TestClient_GetUserProfile(t *testing.T) {
 			},
 		},
 		{
-			name:           "Unauthorized",
-			accessToken:    "invalid-token",
-			responseStatus: http.StatusUnauthorized,
-			responseBody:   `{"error":"invalid_token","error_description":"The access token is invalid"}`,
-			expectedError:  true,
+			name:            "Unauthorized",
+			accessToken:     "invalid-token",
+			responseStatus:  http.StatusUnauthorized,
+			responseBody:    `{"error":"invalid_token","error_description":"The access token is invalid"}`,
+			expectedError:   true,
 			expectedProfile: nil,
 		},
 		{
-			name:           "Server Error",
-			accessToken:    "valid-token",
-			responseStatus: http.StatusInternalServerError,
-			responseBody:   `{"error":"server_error","error_description":"An error occurred on the server"}`,
-			expectedError:  true,
+			name:            "Server Error",
+			accessToken:     "valid-token",
+			responseStatus:  http.StatusInternalServerError,
+			responseBody:    `{"error":"server_error","error_description":"An error occurred on the server"}`,
+			expectedError:   true,
 			expectedProfile: nil,
 		},
 	}
@@ -488,7 +487,7 @@ func TestClient_GetUserProfile(t *testing.T) {
 			// Setup
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				// Verify request
-				assert.Equal(t, "/auth/me", r.URL.Path)
+				assert.Equal(t, "/auth/userinfo", r.URL.Path)
 				assert.Equal(t, "GET", r.Method)
 				assert.Equal(t, fmt.Sprintf("Bearer %s", tc.accessToken), r.Header.Get("Authorization"))
 
@@ -562,7 +561,7 @@ func TestCreateClientCredential_Success(t *testing.T) {
 
 	// Call the method
 	resp, err := client.CreateClientCredential(context.Background(), req)
-	
+
 	// Verify response
 	require.NoError(t, err)
 	require.NotNil(t, resp)
@@ -599,7 +598,7 @@ func TestCreateClientCredential_Error(t *testing.T) {
 
 	// Call the method
 	_, err := client.CreateClientCredential(context.Background(), req)
-	
+
 	// Verify error
 	require.Error(t, err)
 	errorResp, ok := err.(*ErrorResponse)
@@ -613,7 +612,7 @@ func TestListClientCredentials_Success(t *testing.T) {
 		// Check request
 		assert.Equal(t, "GET", r.Method)
 		assert.Equal(t, "/admin/credentials", r.URL.Path)
-		
+
 		// Verify query parameters
 		queryParams := r.URL.Query()
 		assert.Equal(t, "TestApp", queryParams.Get("issuedTo"))
@@ -653,12 +652,12 @@ func TestListClientCredentials_Success(t *testing.T) {
 
 	// Call the method with filters
 	resp, err := client.ListClientCredentials(context.Background(), "TestApp", "tenant-123", "", false, false)
-	
+
 	// Verify response
 	require.NoError(t, err)
 	require.NotNil(t, resp)
 	assert.Len(t, resp.Credentials, 2)
-	
+
 	// Verify first credential
 	assert.Equal(t, "cred-123", resp.Credentials[0].ID)
 	assert.Equal(t, "client-123", resp.Credentials[0].ClientID)
@@ -669,7 +668,7 @@ func TestListClientCredentials_Success(t *testing.T) {
 	assert.Equal(t, "2023-01-01T00:00:00Z", resp.Credentials[0].CreatedAt)
 	assert.Equal(t, "2023-01-02T00:00:00Z", resp.Credentials[0].UpdatedAt)
 	assert.Equal(t, "tenant-123", resp.Credentials[0].TenantID)
-	
+
 	// Verify second credential
 	assert.Equal(t, "cred-456", resp.Credentials[1].ID)
 	assert.Equal(t, "client-456", resp.Credentials[1].ClientID)
@@ -687,7 +686,7 @@ func TestListClientCredentials_NoFilters(t *testing.T) {
 		// Check request
 		assert.Equal(t, "GET", r.Method)
 		assert.Equal(t, "/admin/credentials", r.URL.Path)
-		
+
 		// Verify no query parameters
 		queryParams := r.URL.Query()
 		assert.Equal(t, "", queryParams.Get("issuedTo"))
@@ -705,7 +704,7 @@ func TestListClientCredentials_NoFilters(t *testing.T) {
 
 	// Call the method without filters
 	resp, err := client.ListClientCredentials(context.Background(), "", "", "", false, false)
-	
+
 	// Verify response
 	require.NoError(t, err)
 	require.NotNil(t, resp)
@@ -717,7 +716,7 @@ func TestListClientCredentials_ScopeFilter(t *testing.T) {
 		// Check request
 		assert.Equal(t, "GET", r.Method)
 		assert.Equal(t, "/admin/credentials", r.URL.Path)
-		
+
 		// Verify query parameters
 		queryParams := r.URL.Query()
 		assert.Equal(t, "read:users", queryParams.Get("scope"))
@@ -745,7 +744,7 @@ func TestListClientCredentials_ScopeFilter(t *testing.T) {
 
 	// Call the method with scope filter
 	resp, err := client.ListClientCredentials(context.Background(), "", "", "read:users", false, false)
-	
+
 	// Verify response
 	require.NoError(t, err)
 	require.NotNil(t, resp)
@@ -759,7 +758,7 @@ func TestListClientCredentials_ActiveOnlyFilter(t *testing.T) {
 		// Check request
 		assert.Equal(t, "GET", r.Method)
 		assert.Equal(t, "/admin/credentials", r.URL.Path)
-		
+
 		// Verify query parameters
 		queryParams := r.URL.Query()
 		assert.Equal(t, "true", queryParams.Get("active"))
@@ -787,7 +786,7 @@ func TestListClientCredentials_ActiveOnlyFilter(t *testing.T) {
 
 	// Call the method with activeOnly filter
 	resp, err := client.ListClientCredentials(context.Background(), "", "", "", true, false)
-	
+
 	// Verify response
 	require.NoError(t, err)
 	require.NotNil(t, resp)
@@ -801,7 +800,7 @@ func TestListClientCredentials_InactiveOnlyFilter(t *testing.T) {
 		// Check request
 		assert.Equal(t, "GET", r.Method)
 		assert.Equal(t, "/admin/credentials", r.URL.Path)
-		
+
 		// Verify query parameters
 		queryParams := r.URL.Query()
 		assert.Equal(t, "false", queryParams.Get("active"))
@@ -829,7 +828,7 @@ func TestListClientCredentials_InactiveOnlyFilter(t *testing.T) {
 
 	// Call the method with inactiveOnly filter
 	resp, err := client.ListClientCredentials(context.Background(), "", "", "", false, true)
-	
+
 	// Verify response
 	require.NoError(t, err)
 	require.NotNil(t, resp)
@@ -843,7 +842,7 @@ func TestListClientCredentials_MultipleCriteria(t *testing.T) {
 		// Check request
 		assert.Equal(t, "GET", r.Method)
 		assert.Equal(t, "/admin/credentials", r.URL.Path)
-		
+
 		// Verify query parameters
 		queryParams := r.URL.Query()
 		assert.Equal(t, "TestApp", queryParams.Get("issuedTo"))
@@ -874,7 +873,7 @@ func TestListClientCredentials_MultipleCriteria(t *testing.T) {
 
 	// Call the method with multiple filters
 	resp, err := client.ListClientCredentials(context.Background(), "TestApp", "tenant-123", "read:users", true, false)
-	
+
 	// Verify response
 	require.NoError(t, err)
 	require.NotNil(t, resp)
@@ -888,7 +887,7 @@ func TestListClientCredentials_MultipleCriteria(t *testing.T) {
 
 func TestGetClientCredential_Success(t *testing.T) {
 	credentialID := "cred-123"
-	
+
 	server, client := setupTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Check request
 		assert.Equal(t, "GET", r.Method)
@@ -914,7 +913,7 @@ func TestGetClientCredential_Success(t *testing.T) {
 
 	// Call the method
 	resp, err := client.GetClientCredential(context.Background(), credentialID)
-	
+
 	// Verify response
 	require.NoError(t, err)
 	require.NotNil(t, resp)
@@ -931,7 +930,7 @@ func TestGetClientCredential_Success(t *testing.T) {
 
 func TestGetClientCredential_NotFound(t *testing.T) {
 	credentialID := "nonexistent-id"
-	
+
 	server, client := setupTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Return not found error
 		w.Header().Set("Content-Type", "application/json")
@@ -946,7 +945,7 @@ func TestGetClientCredential_NotFound(t *testing.T) {
 
 	// Call the method
 	_, err := client.GetClientCredential(context.Background(), credentialID)
-	
+
 	// Verify error
 	require.Error(t, err)
 	errorResp, ok := err.(*ErrorResponse)
@@ -960,7 +959,7 @@ func TestUpdateClientCredential_Success(t *testing.T) {
 	activeTrue := true
 	newScopes := []string{"read:users", "write:users", "admin:users"}
 	newDescription := "Updated description"
-	
+
 	server, client := setupTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Check request
 		assert.Equal(t, "PATCH", r.Method)
@@ -1002,7 +1001,7 @@ func TestUpdateClientCredential_Success(t *testing.T) {
 
 	// Call the method
 	resp, err := client.UpdateClientCredential(context.Background(), credentialID, req)
-	
+
 	// Verify response
 	require.NoError(t, err)
 	require.NotNil(t, resp)
@@ -1020,7 +1019,7 @@ func TestUpdateClientCredential_Success(t *testing.T) {
 func TestUpdateClientCredential_PartialUpdate(t *testing.T) {
 	credentialID := "cred-123"
 	activeFalse := false
-	
+
 	server, client := setupTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Check request
 		assert.Equal(t, "PATCH", r.Method)
@@ -1059,7 +1058,7 @@ func TestUpdateClientCredential_PartialUpdate(t *testing.T) {
 
 	// Call the method
 	resp, err := client.UpdateClientCredential(context.Background(), credentialID, req)
-	
+
 	// Verify response
 	require.NoError(t, err)
 	require.NotNil(t, resp)
@@ -1071,7 +1070,7 @@ func TestUpdateClientCredential_PartialUpdate(t *testing.T) {
 
 func TestDeleteClientCredential_Success(t *testing.T) {
 	credentialID := "cred-123"
-	
+
 	server, client := setupTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Check request
 		assert.Equal(t, "DELETE", r.Method)
@@ -1084,14 +1083,14 @@ func TestDeleteClientCredential_Success(t *testing.T) {
 
 	// Call the method
 	err := client.DeleteClientCredential(context.Background(), credentialID)
-	
+
 	// Verify response
 	require.NoError(t, err)
 }
 
 func TestDeleteClientCredential_NotFound(t *testing.T) {
 	credentialID := "nonexistent-id"
-	
+
 	server, client := setupTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Return not found error
 		w.Header().Set("Content-Type", "application/json")
@@ -1106,11 +1105,11 @@ func TestDeleteClientCredential_NotFound(t *testing.T) {
 
 	// Call the method
 	err := client.DeleteClientCredential(context.Background(), credentialID)
-	
+
 	// Verify error
 	require.Error(t, err)
 	errorResp, ok := err.(*ErrorResponse)
 	require.True(t, ok)
 	assert.Equal(t, "not_found", errorResp.ErrorCode)
 	assert.Equal(t, "Client credential not found", errorResp.Description)
-} 
+}
