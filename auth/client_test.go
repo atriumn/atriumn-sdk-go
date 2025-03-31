@@ -107,7 +107,7 @@ func TestHealth(t *testing.T) {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprintln(w, `{"status": "ok"}`)
+		_, _ = fmt.Fprintln(w, `{"status": "ok"}`)
 	}))
 	defer server.Close()
 
@@ -150,7 +150,7 @@ func TestGetClientCredentialsToken(t *testing.T) {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprintln(w, `{
+		_, _ = fmt.Fprintln(w, `{
 			"access_token": "test-token",
 			"token_type": "Bearer",
 			"expires_in": 3600,
@@ -203,7 +203,7 @@ func TestSignupUser(t *testing.T) {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprintln(w, `{"user_id": "user-123"}`)
+		_, _ = fmt.Fprintln(w, `{"user_id": "user-123"}`)
 	}))
 	defer server.Close()
 
@@ -240,7 +240,7 @@ func TestLoginUser(t *testing.T) {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprintln(w, `{
+		_, _ = fmt.Fprintln(w, `{
 			"access_token": "access-token",
 			"id_token": "id-token",
 			"refresh_token": "refresh-token",
@@ -291,7 +291,7 @@ func TestLogoutUser(t *testing.T) {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprintln(w, `{"status": "ok"}`)
+		_, _ = fmt.Fprintln(w, `{"status": "ok"}`)
 	}))
 	defer server.Close()
 
@@ -321,7 +321,7 @@ func TestRequestPasswordReset(t *testing.T) {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprintln(w, `{
+		_, _ = fmt.Fprintln(w, `{
 			"code_delivery_details": {
 				"destination": "t***@example.com",
 				"delivery_medium": "EMAIL",
@@ -375,7 +375,7 @@ func TestConfirmPasswordReset(t *testing.T) {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprintln(w, `{"status": "ok"}`)
+		_, _ = fmt.Fprintln(w, `{"status": "ok"}`)
 	}))
 	defer server.Close()
 
@@ -389,7 +389,7 @@ func TestErrorHandling(t *testing.T) {
 	server, client := setupTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusUnauthorized)
-		fmt.Fprintln(w, `{
+		_, _ = fmt.Fprintln(w, `{
 			"error": "invalid_client",
 			"error_description": "Client authentication failed"
 		}`)
@@ -495,7 +495,7 @@ func TestClient_GetUserProfile(t *testing.T) {
 				// Return response
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(tc.responseStatus)
-				w.Write([]byte(tc.responseBody))
+				_, _ = w.Write([]byte(tc.responseBody))
 			}))
 			defer server.Close()
 

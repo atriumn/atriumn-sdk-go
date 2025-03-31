@@ -236,7 +236,7 @@ func (c *Client) do(req *http.Request, v interface{}) (*http.Response, error) {
 			Description: fmt.Sprintf("Failed to connect to the authentication service: %v", err),
 		}
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	
 	// Read the response body
 	bodyBytes, _ := io.ReadAll(resp.Body)
