@@ -1,0 +1,65 @@
+{
+  "output": {
+    "filePath": "repomix-output.txt",
+    "style": "plain",
+    "fileSummary": true,
+    "directoryStructure": true,
+    "removeComments": false,
+    "removeEmptyLines": false,
+    "topFilesLength": 5,
+    "showLineNumbers": false,
+    "copyToClipboard": false
+  },
+  "include": [],
+  "ignore": {
+    "useGitignore": true,
+    "useDefaultPatterns": true,
+    "customPatterns": [
+      "*.sum",
+      "*.md",
+      "**/*.md",
+      "README.md",
+      "**/README.md",
+      "*.zip",
+      "**/*.zip",
+      "bootstrap",
+      "**/bootstrap",
+      "*.sh",
+      "**/scripts/*.sh",
+      "**/bin/*.sh",
+      "**/*.bash",
+      "*.yaml",
+      "*.yml",
+      "**/openapi.yaml",
+      "**/openapi.yml",
+      "**/swagger.yaml",
+      "**/swagger.yml",
+      "**/api/*.yaml",
+      "**/api/*.yml",
+      "*.lock",
+      "*.log",
+      "*.mod",
+      "package-lock.json",
+      "yarn.lock",
+      "node_modules/**",
+      "dist/**",
+      "build/**",
+      ".git/**",
+      "**/.DS_Store",
+      "**/*.min.js",
+      "**/*.min.css",
+      "coverage/**",
+      "vendor/**",
+      "**/.terraform/**",
+      "*.tfstate",
+      "*.tfstate.backup",
+      "**/*.pb.go"
+    ]
+  },
+  "security": {
+    "enableSecurityCheck": true
+  },
+  "tokenCount": {
+    "encoding": "o200k_base"
+  }
+}
