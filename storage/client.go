@@ -160,7 +160,7 @@ func (c *Client) do(req *http.Request, v interface{}) (*http.Response, error) {
 		}
 	}
 	defer func() { _ = resp.Body.Close() }()
-	
+
 	// Read the response body
 	bodyBytes, _ := io.ReadAll(resp.Body)
 	// Reset the body with a new ReadCloser for further processing
@@ -168,7 +168,7 @@ func (c *Client) do(req *http.Request, v interface{}) (*http.Response, error) {
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		var errResp ErrorResponse
-		
+
 		// We already have the body bytes, no need to read again
 		if len(bodyBytes) > 0 {
 			if jsonErr := json.Unmarshal(bodyBytes, &errResp); jsonErr != nil {
@@ -179,7 +179,7 @@ func (c *Client) do(req *http.Request, v interface{}) (*http.Response, error) {
 				}
 			}
 		}
-		
+
 		// If we received an empty error response, create a user-friendly error based on status code
 		if errResp.ErrorCode == "" && errResp.Description == "" {
 			switch resp.StatusCode {
@@ -206,7 +206,7 @@ func (c *Client) do(req *http.Request, v interface{}) (*http.Response, error) {
 				errResp.Description = fmt.Sprintf("Unexpected HTTP status: %d", resp.StatusCode)
 			}
 		}
-		
+
 		return nil, &errResp
 	}
 
@@ -254,4 +254,4 @@ func (c *Client) GenerateDownloadURL(ctx context.Context, request *GenerateDownl
 	}
 
 	return &resp, nil
-} 
+}

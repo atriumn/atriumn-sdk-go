@@ -142,7 +142,7 @@ func TestGenerateUploadURL_Success(t *testing.T) {
 		ContentType: "text/plain",
 	}
 	resp, err := client.GenerateUploadURL(context.Background(), request)
-	
+
 	assert.NoError(t, err)
 	assert.NotNil(t, resp)
 	assert.Contains(t, resp.UploadURL, "https://example-bucket.s3.amazonaws.com/test-file.txt?X-Amz-Algorithm=AWS4-HMAC-SHA256")
@@ -155,7 +155,7 @@ func TestGenerateUploadURL_WithAuth(t *testing.T) {
 	server, client := setupTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "POST", r.Method)
 		assert.Equal(t, "/generate-upload-url", r.URL.Path)
-		
+
 		// Verify auth header
 		assert.Equal(t, "Bearer "+expectedToken, r.Header.Get("Authorization"))
 
@@ -176,7 +176,7 @@ func TestGenerateUploadURL_WithAuth(t *testing.T) {
 		ContentType: "text/plain",
 	}
 	resp, err := client.GenerateUploadURL(context.Background(), request)
-	
+
 	assert.NoError(t, err)
 	assert.NotNil(t, resp)
 	assert.Contains(t, resp.UploadURL, "https://example-bucket.s3.amazonaws.com/test-file.txt?X-Amz-Algorithm=AWS4-HMAC-SHA256")
@@ -203,10 +203,10 @@ func TestGenerateUploadURL_Error(t *testing.T) {
 		// Filename intentionally omitted
 	}
 	resp, err := client.GenerateUploadURL(context.Background(), request)
-	
+
 	assert.Error(t, err)
 	assert.Nil(t, resp)
-	
+
 	// Check that error is properly parsed
 	errorResp, ok := err.(*ErrorResponse)
 	assert.True(t, ok)
@@ -232,7 +232,7 @@ func TestGenerateUploadURL_TokenProviderError(t *testing.T) {
 		ContentType: "text/plain",
 	}
 	resp, err := client.GenerateUploadURL(context.Background(), request)
-	
+
 	assert.Error(t, err)
 	assert.Nil(t, resp)
 	assert.Contains(t, err.Error(), "token provider failed")
@@ -264,7 +264,7 @@ func TestGenerateDownloadURL_Success(t *testing.T) {
 		S3Key: "tenant-123/files/document.pdf",
 	}
 	resp, err := client.GenerateDownloadURL(context.Background(), request)
-	
+
 	assert.NoError(t, err)
 	assert.NotNil(t, resp)
 	assert.Contains(t, resp.DownloadURL, "https://example-bucket.s3.amazonaws.com/tenant-123/files/document.pdf?X-Amz-Algorithm=AWS4-HMAC-SHA256")
@@ -277,7 +277,7 @@ func TestGenerateDownloadURL_WithAuth(t *testing.T) {
 	server, client := setupTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "POST", r.Method)
 		assert.Equal(t, "/generate-download-url", r.URL.Path)
-		
+
 		// Verify auth header
 		assert.Equal(t, "Bearer "+expectedToken, r.Header.Get("Authorization"))
 
@@ -297,7 +297,7 @@ func TestGenerateDownloadURL_WithAuth(t *testing.T) {
 		S3Key: "tenant-123/files/document.pdf",
 	}
 	resp, err := client.GenerateDownloadURL(context.Background(), request)
-	
+
 	assert.NoError(t, err)
 	assert.NotNil(t, resp)
 	assert.Contains(t, resp.DownloadURL, "https://example-bucket.s3.amazonaws.com/tenant-123/files/document.pdf?X-Amz-Algorithm=AWS4-HMAC-SHA256")
@@ -323,10 +323,10 @@ func TestGenerateDownloadURL_Error(t *testing.T) {
 		S3Key: "tenant-123/files/non-existent.pdf",
 	}
 	resp, err := client.GenerateDownloadURL(context.Background(), request)
-	
+
 	assert.Error(t, err)
 	assert.Nil(t, resp)
-	
+
 	// Check that error is properly parsed
 	errorResp, ok := err.(*ErrorResponse)
 	assert.True(t, ok)
@@ -380,12 +380,12 @@ func TestNetworkError(t *testing.T) {
 		ContentType: "text/plain",
 	}
 	resp, err := client.GenerateUploadURL(context.Background(), request)
-	
+
 	assert.Error(t, err)
 	assert.Nil(t, resp)
-	
+
 	// Check that the error is of type ErrorResponse
 	errorResp, ok := err.(*ErrorResponse)
 	assert.True(t, ok)
 	assert.Equal(t, "request_timeout", errorResp.ErrorCode)
-} 
+}
