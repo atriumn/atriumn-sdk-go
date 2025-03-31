@@ -125,8 +125,8 @@ func TestGetClientCredentialsToken(t *testing.T) {
 		if r.Method != "POST" {
 			t.Errorf("Expected POST request, got %s", r.Method)
 		}
-		if r.URL.Path != "/oauth2/token" {
-			t.Errorf("Expected /oauth2/token path, got %s", r.URL.Path)
+		if r.URL.Path != "/auth/token" {
+			t.Errorf("Expected /auth/token path, got %s", r.URL.Path)
 		}
 
 		// Verify request body
@@ -305,8 +305,8 @@ func TestRequestPasswordReset(t *testing.T) {
 		if r.Method != "POST" {
 			t.Errorf("Expected POST request, got %s", r.Method)
 		}
-		if r.URL.Path != "/auth/forgot-password" {
-			t.Errorf("Expected /auth/forgot-password path, got %s", r.URL.Path)
+		if r.URL.Path != "/auth/password/reset" {
+			t.Errorf("Expected /auth/password/reset path, got %s", r.URL.Path)
 		}
 
 		// Verify request body
@@ -353,8 +353,8 @@ func TestConfirmPasswordReset(t *testing.T) {
 		if r.Method != "POST" {
 			t.Errorf("Expected POST request, got %s", r.Method)
 		}
-		if r.URL.Path != "/auth/confirm-forgot-password" {
-			t.Errorf("Expected /auth/confirm-forgot-password path, got %s", r.URL.Path)
+		if r.URL.Path != "/auth/password/confirm" {
+			t.Errorf("Expected /auth/password/confirm path, got %s", r.URL.Path)
 		}
 
 		// Verify request body
@@ -487,7 +487,7 @@ func TestClient_GetUserProfile(t *testing.T) {
 			// Setup
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				// Verify request
-				assert.Equal(t, "/auth/userinfo", r.URL.Path)
+				assert.Equal(t, "/auth/me", r.URL.Path)
 				assert.Equal(t, "GET", r.Method)
 				assert.Equal(t, fmt.Sprintf("Bearer %s", tc.accessToken), r.Header.Get("Authorization"))
 

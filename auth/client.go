@@ -273,7 +273,7 @@ func (c *Client) GetClientCredentialsToken(ctx context.Context, clientID, client
 		Scope:        scope,
 	}
 
-	req, err := c.newRequest(ctx, "POST", "/oauth2/token", tokenReq)
+	req, err := c.newRequest(ctx, "POST", "/auth/token", tokenReq)
 	if err != nil {
 		return nil, err
 	}
@@ -316,7 +316,7 @@ func (c *Client) ConfirmSignup(ctx context.Context, username, code string) error
 		ConfirmationCode: code,
 	}
 
-	req, err := c.newRequest(ctx, "POST", "/auth/confirm-signup", confirmReq)
+	req, err := c.newRequest(ctx, "POST", "/auth/signup/confirm", confirmReq)
 	if err != nil {
 		return err
 	}
@@ -331,7 +331,7 @@ func (c *Client) ResendConfirmationCode(ctx context.Context, username string) (*
 		Username: username,
 	}
 
-	req, err := c.newRequest(ctx, "POST", "/auth/resend-confirmation-code", resendReq)
+	req, err := c.newRequest(ctx, "POST", "/auth/signup/resend", resendReq)
 	if err != nil {
 		return nil, err
 	}
@@ -389,7 +389,7 @@ func (c *Client) RequestPasswordReset(ctx context.Context, email string) (*Passw
 		Email: email,
 	}
 
-	req, err := c.newRequest(ctx, "POST", "/auth/forgot-password", resetReq)
+	req, err := c.newRequest(ctx, "POST", "/auth/password/reset", resetReq)
 	if err != nil {
 		return nil, err
 	}
@@ -411,7 +411,7 @@ func (c *Client) ConfirmPasswordReset(ctx context.Context, email, code, newPassw
 		NewPassword: newPassword,
 	}
 
-	req, err := c.newRequest(ctx, "POST", "/auth/confirm-forgot-password", confirmReq)
+	req, err := c.newRequest(ctx, "POST", "/auth/password/confirm", confirmReq)
 	if err != nil {
 		return err
 	}
@@ -422,7 +422,7 @@ func (c *Client) ConfirmPasswordReset(ctx context.Context, email, code, newPassw
 
 // GetUserProfile gets a user's profile
 func (c *Client) GetUserProfile(ctx context.Context, accessToken string) (*UserProfileResponse, error) {
-	req, err := c.newRequest(ctx, "GET", "/auth/userinfo", nil)
+	req, err := c.newRequest(ctx, "GET", "/auth/me", nil)
 	if err != nil {
 		return nil, err
 	}
