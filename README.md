@@ -1,6 +1,3 @@
-<<<<<<< HEAD
-# atriumn-sdk-go
-=======
 # Atriumn SDK for Go
 
 This repository contains the official Go SDKs for Atriumn services.
@@ -15,11 +12,22 @@ Go client for the Atriumn Authentication Service. Provides functionality for:
 - User signup, login, and management
 - Password reset workflows
 
+### [Storage](/storage)
+
+Go client for the Atriumn Storage Service. Provides functionality for:
+
+- Generating pre-signed S3 URLs for file uploads
+- Generating pre-signed S3 URLs for file downloads
+- JWT token-based authentication
+
 ## Installation
 
 ```bash
 # Install the auth client
 go get github.com/atriumn/atriumn-sdk-go/auth
+
+# Install the storage client
+go get github.com/atriumn/atriumn-sdk-go/storage
 ```
 
 ## Development
@@ -32,9 +40,9 @@ go test -v ./...
 
 # Test a specific package
 go test -v ./auth
+go test -v ./storage
 ```
 
 ## License
 
 [MIT](LICENSE)
->>>>>>> 2e05542 (feat: Initial commit of Go SDK with auth client)
