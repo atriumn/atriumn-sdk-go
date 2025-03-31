@@ -242,7 +242,7 @@ func (c *Client) CreateClientCredential(ctx context.Context, req ClientCredentia
 }
 
 // ListClientCredentials lists client credentials with optional filters
-func (c *Client) ListClientCredentials(ctx context.Context, issuedToFilter, tenantIDFilter string) (*ListClientCredentialsResponse, error) {
+func (c *Client) ListClientCredentials(ctx context.Context, issuedToFilter, tenantIDFilter, scopeFilter string, activeOnly, inactiveOnly bool) (*ListClientCredentialsResponse, error) {
 	httpReq, err := c.newRequest(ctx, "GET", "/admin/credentials", nil)
 	if err != nil {
 		return nil, err
@@ -255,6 +255,14 @@ func (c *Client) ListClientCredentials(ctx context.Context, issuedToFilter, tena
 	}
 	if tenantIDFilter != "" {
 		q.Add("tenantId", tenantIDFilter)
+	}
+	if scopeFilter != "" {
+		q.Add("scope", scopeFilter)
+	}
+	if activeOnly {
+		q.Add("active", "true")
+	} else if inactiveOnly {
+		q.Add("active", "false")
 	}
 	httpReq.URL.RawQuery = q.Encode()
 

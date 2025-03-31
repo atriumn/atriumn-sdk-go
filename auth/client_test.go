@@ -652,7 +652,7 @@ func TestListClientCredentials_Success(t *testing.T) {
 	defer server.Close()
 
 	// Call the method with filters
-	resp, err := client.ListClientCredentials(context.Background(), "TestApp", "tenant-123")
+	resp, err := client.ListClientCredentials(context.Background(), "TestApp", "tenant-123", "", false, false)
 	
 	// Verify response
 	require.NoError(t, err)
@@ -692,6 +692,8 @@ func TestListClientCredentials_NoFilters(t *testing.T) {
 		queryParams := r.URL.Query()
 		assert.Equal(t, "", queryParams.Get("issuedTo"))
 		assert.Equal(t, "", queryParams.Get("tenantId"))
+		assert.Equal(t, "", queryParams.Get("scope"))
+		assert.Equal(t, "", queryParams.Get("active"))
 
 		// Return successful response
 		w.Header().Set("Content-Type", "application/json")
@@ -702,12 +704,186 @@ func TestListClientCredentials_NoFilters(t *testing.T) {
 	defer server.Close()
 
 	// Call the method without filters
-	resp, err := client.ListClientCredentials(context.Background(), "", "")
+	resp, err := client.ListClientCredentials(context.Background(), "", "", "", false, false)
 	
 	// Verify response
 	require.NoError(t, err)
 	require.NotNil(t, resp)
 	assert.Empty(t, resp.Credentials)
+}
+
+func TestListClientCredentials_ScopeFilter(t *testing.T) {
+	server, client := setupTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Check request
+		assert.Equal(t, "GET", r.Method)
+		assert.Equal(t, "/admin/credentials", r.URL.Path)
+		
+		// Verify query parameters
+		queryParams := r.URL.Query()
+		assert.Equal(t, "read:users", queryParams.Get("scope"))
+
+		// Return successful response
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		response := `{
+			"credentials": [
+				{
+					"id": "cred-123",
+					"client_id": "client-123",
+					"issued_to": "TestApp",
+					"scopes": ["read:users"],
+					"description": "Test credential with read:users scope",
+					"active": true,
+					"created_at": "2023-01-01T00:00:00Z",
+					"tenant_id": "tenant-123"
+				}
+			]
+		}`
+		_, _ = w.Write([]byte(response))
+	}))
+	defer server.Close()
+
+	// Call the method with scope filter
+	resp, err := client.ListClientCredentials(context.Background(), "", "", "read:users", false, false)
+	
+	// Verify response
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	assert.Len(t, resp.Credentials, 1)
+	assert.Equal(t, "cred-123", resp.Credentials[0].ID)
+	assert.Equal(t, []string{"read:users"}, resp.Credentials[0].Scopes)
+}
+
+func TestListClientCredentials_ActiveOnlyFilter(t *testing.T) {
+	server, client := setupTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Check request
+		assert.Equal(t, "GET", r.Method)
+		assert.Equal(t, "/admin/credentials", r.URL.Path)
+		
+		// Verify query parameters
+		queryParams := r.URL.Query()
+		assert.Equal(t, "true", queryParams.Get("active"))
+
+		// Return successful response
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		response := `{
+			"credentials": [
+				{
+					"id": "cred-123",
+					"client_id": "client-123",
+					"issued_to": "TestApp",
+					"scopes": ["read:users"],
+					"description": "Active test credential",
+					"active": true,
+					"created_at": "2023-01-01T00:00:00Z",
+					"tenant_id": "tenant-123"
+				}
+			]
+		}`
+		_, _ = w.Write([]byte(response))
+	}))
+	defer server.Close()
+
+	// Call the method with activeOnly filter
+	resp, err := client.ListClientCredentials(context.Background(), "", "", "", true, false)
+	
+	// Verify response
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	assert.Len(t, resp.Credentials, 1)
+	assert.Equal(t, "cred-123", resp.Credentials[0].ID)
+	assert.True(t, resp.Credentials[0].Active)
+}
+
+func TestListClientCredentials_InactiveOnlyFilter(t *testing.T) {
+	server, client := setupTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Check request
+		assert.Equal(t, "GET", r.Method)
+		assert.Equal(t, "/admin/credentials", r.URL.Path)
+		
+		// Verify query parameters
+		queryParams := r.URL.Query()
+		assert.Equal(t, "false", queryParams.Get("active"))
+
+		// Return successful response
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		response := `{
+			"credentials": [
+				{
+					"id": "cred-456",
+					"client_id": "client-456",
+					"issued_to": "TestApp2",
+					"scopes": ["write:users"],
+					"description": "Inactive test credential",
+					"active": false,
+					"created_at": "2023-01-01T00:00:00Z",
+					"tenant_id": "tenant-123"
+				}
+			]
+		}`
+		_, _ = w.Write([]byte(response))
+	}))
+	defer server.Close()
+
+	// Call the method with inactiveOnly filter
+	resp, err := client.ListClientCredentials(context.Background(), "", "", "", false, true)
+	
+	// Verify response
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	assert.Len(t, resp.Credentials, 1)
+	assert.Equal(t, "cred-456", resp.Credentials[0].ID)
+	assert.False(t, resp.Credentials[0].Active)
+}
+
+func TestListClientCredentials_MultipleCriteria(t *testing.T) {
+	server, client := setupTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Check request
+		assert.Equal(t, "GET", r.Method)
+		assert.Equal(t, "/admin/credentials", r.URL.Path)
+		
+		// Verify query parameters
+		queryParams := r.URL.Query()
+		assert.Equal(t, "TestApp", queryParams.Get("issuedTo"))
+		assert.Equal(t, "tenant-123", queryParams.Get("tenantId"))
+		assert.Equal(t, "read:users", queryParams.Get("scope"))
+		assert.Equal(t, "true", queryParams.Get("active"))
+
+		// Return successful response
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		response := `{
+			"credentials": [
+				{
+					"id": "cred-123",
+					"client_id": "client-123",
+					"issued_to": "TestApp",
+					"scopes": ["read:users"],
+					"description": "Active test credential",
+					"active": true,
+					"created_at": "2023-01-01T00:00:00Z",
+					"tenant_id": "tenant-123"
+				}
+			]
+		}`
+		_, _ = w.Write([]byte(response))
+	}))
+	defer server.Close()
+
+	// Call the method with multiple filters
+	resp, err := client.ListClientCredentials(context.Background(), "TestApp", "tenant-123", "read:users", true, false)
+	
+	// Verify response
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	assert.Len(t, resp.Credentials, 1)
+	assert.Equal(t, "cred-123", resp.Credentials[0].ID)
+	assert.Equal(t, "TestApp", resp.Credentials[0].IssuedTo)
+	assert.Equal(t, "tenant-123", resp.Credentials[0].TenantID)
+	assert.Equal(t, []string{"read:users"}, resp.Credentials[0].Scopes)
+	assert.True(t, resp.Credentials[0].Active)
 }
 
 func TestGetClientCredential_Success(t *testing.T) {
