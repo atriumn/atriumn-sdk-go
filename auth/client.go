@@ -180,6 +180,147 @@ type UserProfileResponse struct {
 	Attributes map[string]string `json:"attributes"`
 }
 
+// Admin Credentials API
+
+// ClientCredentialCreateRequest represents a request to create a new client credential
+type ClientCredentialCreateRequest struct {
+	IssuedTo    string   `json:"issued_to"`
+	Scopes      []string `json:"scopes"`
+	Description string   `json:"description,omitempty"`
+	TenantID    string   `json:"tenant_id,omitempty"`
+}
+
+// ClientCredentialUpdateRequest represents a request to update a client credential
+type ClientCredentialUpdateRequest struct {
+	Active      *bool     `json:"active,omitempty"`
+	Scopes      *[]string `json:"scopes,omitempty"`
+	Description *string   `json:"description,omitempty"`
+}
+
+// ClientCredentialResponse represents a client credential response without the secret
+type ClientCredentialResponse struct {
+	ID          string    `json:"id"`
+	ClientID    string    `json:"client_id"`
+	IssuedTo    string    `json:"issued_to"`
+	Scopes      []string  `json:"scopes"`
+	Description string    `json:"description"`
+	Active      bool      `json:"active"`
+	CreatedAt   string    `json:"created_at"`
+	UpdatedAt   string    `json:"updated_at,omitempty"`
+	TenantID    string    `json:"tenant_id"`
+}
+
+// ClientCredentialCreateResponse represents a client credential create response with the secret
+type ClientCredentialCreateResponse struct {
+	ClientCredentialResponse
+	ClientSecret string `json:"client_secret"`
+}
+
+// ListClientCredentialsResponse represents the response from listing client credentials
+type ListClientCredentialsResponse struct {
+	Credentials []ClientCredentialResponse `json:"credentials"`
+}
+
+// CreateClientCredential creates a new client credential
+func (c *Client) CreateClientCredential(ctx context.Context, req ClientCredentialCreateRequest) (*ClientCredentialCreateResponse, error) {
+	httpReq, err := c.newRequest(ctx, "POST", "/admin/credentials", req)
+	if err != nil {
+		return nil, err
+	}
+
+	var resp ClientCredentialCreateResponse
+	httpResp, err := c.do(httpReq, &resp)
+	if err != nil {
+		return nil, err
+	}
+
+	if httpResp.StatusCode != http.StatusCreated {
+		return nil, fmt.Errorf("unexpected status code: %d", httpResp.StatusCode)
+	}
+
+	return &resp, nil
+}
+
+// ListClientCredentials lists client credentials with optional filters
+func (c *Client) ListClientCredentials(ctx context.Context, issuedToFilter, tenantIDFilter string) (*ListClientCredentialsResponse, error) {
+	httpReq, err := c.newRequest(ctx, "GET", "/admin/credentials", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	// Add query parameters if they are provided
+	q := httpReq.URL.Query()
+	if issuedToFilter != "" {
+		q.Add("issuedTo", issuedToFilter)
+	}
+	if tenantIDFilter != "" {
+		q.Add("tenantId", tenantIDFilter)
+	}
+	httpReq.URL.RawQuery = q.Encode()
+
+	var resp ListClientCredentialsResponse
+	_, err = c.do(httpReq, &resp)
+	if err != nil {
+		return nil, err
+	}
+
+	return &resp, nil
+}
+
+// GetClientCredential gets a client credential by ID
+func (c *Client) GetClientCredential(ctx context.Context, id string) (*ClientCredentialResponse, error) {
+	path := fmt.Sprintf("/admin/credentials/%s", id)
+	httpReq, err := c.newRequest(ctx, "GET", path, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var resp ClientCredentialResponse
+	_, err = c.do(httpReq, &resp)
+	if err != nil {
+		return nil, err
+	}
+
+	return &resp, nil
+}
+
+// UpdateClientCredential updates a client credential by ID
+func (c *Client) UpdateClientCredential(ctx context.Context, id string, req ClientCredentialUpdateRequest) (*ClientCredentialResponse, error) {
+	path := fmt.Sprintf("/admin/credentials/%s", id)
+	httpReq, err := c.newRequest(ctx, "PATCH", path, req)
+	if err != nil {
+		return nil, err
+	}
+
+	var resp ClientCredentialResponse
+	_, err = c.do(httpReq, &resp)
+	if err != nil {
+		return nil, err
+	}
+
+	return &resp, nil
+}
+
+// DeleteClientCredential deletes a client credential by ID
+func (c *Client) DeleteClientCredential(ctx context.Context, id string) error {
+	path := fmt.Sprintf("/admin/credentials/%s", id)
+	httpReq, err := c.newRequest(ctx, "DELETE", path, nil)
+	if err != nil {
+		return err
+	}
+
+	httpResp, err := c.do(httpReq, nil)
+	if err != nil {
+		return err
+	}
+
+	if httpResp.StatusCode != http.StatusNoContent {
+		return fmt.Errorf("unexpected status code: %d", httpResp.StatusCode)
+	}
+
+	return nil
+}
+
 // newRequest creates an API request with the specified method, path, and body
 func (c *Client) newRequest(ctx context.Context, method, path string, body interface{}) (*http.Request, error) {
 	rel, err := url.Parse(path)

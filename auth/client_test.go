@@ -516,4 +516,425 @@ func TestClient_GetUserProfile(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestCreateClientCredential_Success(t *testing.T) {
+	server, client := setupTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Check request
+		assert.Equal(t, "POST", r.Method)
+		assert.Equal(t, "/admin/credentials", r.URL.Path)
+		assert.Equal(t, "application/json", r.Header.Get("Content-Type"))
+
+		// Verify request body
+		var req ClientCredentialCreateRequest
+		err := json.NewDecoder(r.Body).Decode(&req)
+		require.NoError(t, err)
+		assert.Equal(t, "Test App", req.IssuedTo)
+		assert.Equal(t, []string{"read:users", "write:users"}, req.Scopes)
+		assert.Equal(t, "Test credential", req.Description)
+		assert.Equal(t, "tenant-123", req.TenantID)
+
+		// Return successful response
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		response := `{
+			"id": "cred-123",
+			"client_id": "client-123",
+			"client_secret": "secret-abc",
+			"issued_to": "Test App",
+			"scopes": ["read:users", "write:users"],
+			"description": "Test credential",
+			"active": true,
+			"created_at": "2023-01-01T00:00:00Z",
+			"tenant_id": "tenant-123"
+		}`
+		_, _ = w.Write([]byte(response))
+	}))
+	defer server.Close()
+
+	// Create request
+	req := ClientCredentialCreateRequest{
+		IssuedTo:    "Test App",
+		Scopes:      []string{"read:users", "write:users"},
+		Description: "Test credential",
+		TenantID:    "tenant-123",
+	}
+
+	// Call the method
+	resp, err := client.CreateClientCredential(context.Background(), req)
+	
+	// Verify response
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	assert.Equal(t, "cred-123", resp.ID)
+	assert.Equal(t, "client-123", resp.ClientID)
+	assert.Equal(t, "secret-abc", resp.ClientSecret)
+	assert.Equal(t, "Test App", resp.IssuedTo)
+	assert.Equal(t, []string{"read:users", "write:users"}, resp.Scopes)
+	assert.Equal(t, "Test credential", resp.Description)
+	assert.True(t, resp.Active)
+	assert.Equal(t, "2023-01-01T00:00:00Z", resp.CreatedAt)
+	assert.Equal(t, "tenant-123", resp.TenantID)
+}
+
+func TestCreateClientCredential_Error(t *testing.T) {
+	server, client := setupTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Return error response
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		errorResp := `{
+			"error": "invalid_request",
+			"error_description": "Scopes array cannot be empty"
+		}`
+		_, _ = w.Write([]byte(errorResp))
+	}))
+	defer server.Close()
+
+	// Create request with invalid data
+	req := ClientCredentialCreateRequest{
+		IssuedTo:    "Test App",
+		Scopes:      []string{}, // Empty scopes will trigger error
+		Description: "Test credential",
+	}
+
+	// Call the method
+	_, err := client.CreateClientCredential(context.Background(), req)
+	
+	// Verify error
+	require.Error(t, err)
+	errorResp, ok := err.(*ErrorResponse)
+	require.True(t, ok)
+	assert.Equal(t, "invalid_request", errorResp.ErrorCode)
+	assert.Equal(t, "Scopes array cannot be empty", errorResp.Description)
+}
+
+func TestListClientCredentials_Success(t *testing.T) {
+	server, client := setupTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Check request
+		assert.Equal(t, "GET", r.Method)
+		assert.Equal(t, "/admin/credentials", r.URL.Path)
+		
+		// Verify query parameters
+		queryParams := r.URL.Query()
+		assert.Equal(t, "TestApp", queryParams.Get("issuedTo"))
+		assert.Equal(t, "tenant-123", queryParams.Get("tenantId"))
+
+		// Return successful response
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		response := `{
+			"credentials": [
+				{
+					"id": "cred-123",
+					"client_id": "client-123",
+					"issued_to": "TestApp",
+					"scopes": ["read:users"],
+					"description": "Test credential 1",
+					"active": true,
+					"created_at": "2023-01-01T00:00:00Z",
+					"updated_at": "2023-01-02T00:00:00Z",
+					"tenant_id": "tenant-123"
+				},
+				{
+					"id": "cred-456",
+					"client_id": "client-456",
+					"issued_to": "TestApp2",
+					"scopes": ["write:users"],
+					"description": "Test credential 2",
+					"active": false,
+					"created_at": "2023-01-01T00:00:00Z",
+					"tenant_id": "tenant-123"
+				}
+			]
+		}`
+		_, _ = w.Write([]byte(response))
+	}))
+	defer server.Close()
+
+	// Call the method with filters
+	resp, err := client.ListClientCredentials(context.Background(), "TestApp", "tenant-123")
+	
+	// Verify response
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	assert.Len(t, resp.Credentials, 2)
+	
+	// Verify first credential
+	assert.Equal(t, "cred-123", resp.Credentials[0].ID)
+	assert.Equal(t, "client-123", resp.Credentials[0].ClientID)
+	assert.Equal(t, "TestApp", resp.Credentials[0].IssuedTo)
+	assert.Equal(t, []string{"read:users"}, resp.Credentials[0].Scopes)
+	assert.Equal(t, "Test credential 1", resp.Credentials[0].Description)
+	assert.True(t, resp.Credentials[0].Active)
+	assert.Equal(t, "2023-01-01T00:00:00Z", resp.Credentials[0].CreatedAt)
+	assert.Equal(t, "2023-01-02T00:00:00Z", resp.Credentials[0].UpdatedAt)
+	assert.Equal(t, "tenant-123", resp.Credentials[0].TenantID)
+	
+	// Verify second credential
+	assert.Equal(t, "cred-456", resp.Credentials[1].ID)
+	assert.Equal(t, "client-456", resp.Credentials[1].ClientID)
+	assert.Equal(t, "TestApp2", resp.Credentials[1].IssuedTo)
+	assert.Equal(t, []string{"write:users"}, resp.Credentials[1].Scopes)
+	assert.Equal(t, "Test credential 2", resp.Credentials[1].Description)
+	assert.False(t, resp.Credentials[1].Active)
+	assert.Equal(t, "2023-01-01T00:00:00Z", resp.Credentials[1].CreatedAt)
+	assert.Equal(t, "", resp.Credentials[1].UpdatedAt)
+	assert.Equal(t, "tenant-123", resp.Credentials[1].TenantID)
+}
+
+func TestListClientCredentials_NoFilters(t *testing.T) {
+	server, client := setupTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Check request
+		assert.Equal(t, "GET", r.Method)
+		assert.Equal(t, "/admin/credentials", r.URL.Path)
+		
+		// Verify no query parameters
+		queryParams := r.URL.Query()
+		assert.Equal(t, "", queryParams.Get("issuedTo"))
+		assert.Equal(t, "", queryParams.Get("tenantId"))
+
+		// Return successful response
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		response := `{"credentials": []}`
+		_, _ = w.Write([]byte(response))
+	}))
+	defer server.Close()
+
+	// Call the method without filters
+	resp, err := client.ListClientCredentials(context.Background(), "", "")
+	
+	// Verify response
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	assert.Empty(t, resp.Credentials)
+}
+
+func TestGetClientCredential_Success(t *testing.T) {
+	credentialID := "cred-123"
+	
+	server, client := setupTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Check request
+		assert.Equal(t, "GET", r.Method)
+		assert.Equal(t, "/admin/credentials/"+credentialID, r.URL.Path)
+
+		// Return successful response
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		response := `{
+			"id": "cred-123",
+			"client_id": "client-123",
+			"issued_to": "TestApp",
+			"scopes": ["read:users", "write:users"],
+			"description": "Test credential",
+			"active": true,
+			"created_at": "2023-01-01T00:00:00Z",
+			"updated_at": "2023-01-02T00:00:00Z",
+			"tenant_id": "tenant-123"
+		}`
+		_, _ = w.Write([]byte(response))
+	}))
+	defer server.Close()
+
+	// Call the method
+	resp, err := client.GetClientCredential(context.Background(), credentialID)
+	
+	// Verify response
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	assert.Equal(t, "cred-123", resp.ID)
+	assert.Equal(t, "client-123", resp.ClientID)
+	assert.Equal(t, "TestApp", resp.IssuedTo)
+	assert.Equal(t, []string{"read:users", "write:users"}, resp.Scopes)
+	assert.Equal(t, "Test credential", resp.Description)
+	assert.True(t, resp.Active)
+	assert.Equal(t, "2023-01-01T00:00:00Z", resp.CreatedAt)
+	assert.Equal(t, "2023-01-02T00:00:00Z", resp.UpdatedAt)
+	assert.Equal(t, "tenant-123", resp.TenantID)
+}
+
+func TestGetClientCredential_NotFound(t *testing.T) {
+	credentialID := "nonexistent-id"
+	
+	server, client := setupTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Return not found error
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNotFound)
+		errorResp := `{
+			"error": "not_found",
+			"error_description": "Client credential not found"
+		}`
+		_, _ = w.Write([]byte(errorResp))
+	}))
+	defer server.Close()
+
+	// Call the method
+	_, err := client.GetClientCredential(context.Background(), credentialID)
+	
+	// Verify error
+	require.Error(t, err)
+	errorResp, ok := err.(*ErrorResponse)
+	require.True(t, ok)
+	assert.Equal(t, "not_found", errorResp.ErrorCode)
+	assert.Equal(t, "Client credential not found", errorResp.Description)
+}
+
+func TestUpdateClientCredential_Success(t *testing.T) {
+	credentialID := "cred-123"
+	activeTrue := true
+	newScopes := []string{"read:users", "write:users", "admin:users"}
+	newDescription := "Updated description"
+	
+	server, client := setupTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Check request
+		assert.Equal(t, "PATCH", r.Method)
+		assert.Equal(t, "/admin/credentials/"+credentialID, r.URL.Path)
+		assert.Equal(t, "application/json", r.Header.Get("Content-Type"))
+
+		// Verify request body
+		var req ClientCredentialUpdateRequest
+		err := json.NewDecoder(r.Body).Decode(&req)
+		require.NoError(t, err)
+		assert.Equal(t, &activeTrue, req.Active)
+		assert.Equal(t, &newScopes, req.Scopes)
+		assert.Equal(t, &newDescription, req.Description)
+
+		// Return successful response
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		response := `{
+			"id": "cred-123",
+			"client_id": "client-123",
+			"issued_to": "TestApp",
+			"scopes": ["read:users", "write:users", "admin:users"],
+			"description": "Updated description",
+			"active": true,
+			"created_at": "2023-01-01T00:00:00Z",
+			"updated_at": "2023-01-03T00:00:00Z",
+			"tenant_id": "tenant-123"
+		}`
+		_, _ = w.Write([]byte(response))
+	}))
+	defer server.Close()
+
+	// Create update request
+	req := ClientCredentialUpdateRequest{
+		Active:      &activeTrue,
+		Scopes:      &newScopes,
+		Description: &newDescription,
+	}
+
+	// Call the method
+	resp, err := client.UpdateClientCredential(context.Background(), credentialID, req)
+	
+	// Verify response
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	assert.Equal(t, "cred-123", resp.ID)
+	assert.Equal(t, "client-123", resp.ClientID)
+	assert.Equal(t, "TestApp", resp.IssuedTo)
+	assert.Equal(t, []string{"read:users", "write:users", "admin:users"}, resp.Scopes)
+	assert.Equal(t, "Updated description", resp.Description)
+	assert.True(t, resp.Active)
+	assert.Equal(t, "2023-01-01T00:00:00Z", resp.CreatedAt)
+	assert.Equal(t, "2023-01-03T00:00:00Z", resp.UpdatedAt)
+	assert.Equal(t, "tenant-123", resp.TenantID)
+}
+
+func TestUpdateClientCredential_PartialUpdate(t *testing.T) {
+	credentialID := "cred-123"
+	activeFalse := false
+	
+	server, client := setupTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Check request
+		assert.Equal(t, "PATCH", r.Method)
+		assert.Equal(t, "/admin/credentials/"+credentialID, r.URL.Path)
+
+		// Verify request body
+		var req ClientCredentialUpdateRequest
+		err := json.NewDecoder(r.Body).Decode(&req)
+		require.NoError(t, err)
+		assert.Equal(t, &activeFalse, req.Active)
+		assert.Nil(t, req.Scopes)
+		assert.Nil(t, req.Description)
+
+		// Return successful response
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		response := `{
+			"id": "cred-123",
+			"client_id": "client-123",
+			"issued_to": "TestApp",
+			"scopes": ["read:users"],
+			"description": "Original description",
+			"active": false,
+			"created_at": "2023-01-01T00:00:00Z",
+			"updated_at": "2023-01-03T00:00:00Z",
+			"tenant_id": "tenant-123"
+		}`
+		_, _ = w.Write([]byte(response))
+	}))
+	defer server.Close()
+
+	// Create update request with only active status
+	req := ClientCredentialUpdateRequest{
+		Active: &activeFalse,
+	}
+
+	// Call the method
+	resp, err := client.UpdateClientCredential(context.Background(), credentialID, req)
+	
+	// Verify response
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	assert.Equal(t, "cred-123", resp.ID)
+	assert.Equal(t, false, resp.Active)
+	assert.Equal(t, []string{"read:users"}, resp.Scopes)
+	assert.Equal(t, "Original description", resp.Description)
+}
+
+func TestDeleteClientCredential_Success(t *testing.T) {
+	credentialID := "cred-123"
+	
+	server, client := setupTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Check request
+		assert.Equal(t, "DELETE", r.Method)
+		assert.Equal(t, "/admin/credentials/"+credentialID, r.URL.Path)
+
+		// Return successful response
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer server.Close()
+
+	// Call the method
+	err := client.DeleteClientCredential(context.Background(), credentialID)
+	
+	// Verify response
+	require.NoError(t, err)
+}
+
+func TestDeleteClientCredential_NotFound(t *testing.T) {
+	credentialID := "nonexistent-id"
+	
+	server, client := setupTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Return not found error
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNotFound)
+		errorResp := `{
+			"error": "not_found",
+			"error_description": "Client credential not found"
+		}`
+		_, _ = w.Write([]byte(errorResp))
+	}))
+	defer server.Close()
+
+	// Call the method
+	err := client.DeleteClientCredential(context.Background(), credentialID)
+	
+	// Verify error
+	require.Error(t, err)
+	errorResp, ok := err.(*ErrorResponse)
+	require.True(t, ok)
+	assert.Equal(t, "not_found", errorResp.ErrorCode)
+	assert.Equal(t, "Client credential not found", errorResp.Description)
 } 
