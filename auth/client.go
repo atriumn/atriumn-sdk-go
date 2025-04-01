@@ -222,7 +222,14 @@ func (c *Client) do(req *http.Request, v interface{}) (*http.Response, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if cerr := resp.Body.Close(); cerr != nil {
+			// If we already have an error, preserve it but log the close error
+			if err == nil {
+				err = cerr
+			}
+		}
+	}()
 
 	if resp.StatusCode >= 400 {
 		body, err := io.ReadAll(resp.Body)
