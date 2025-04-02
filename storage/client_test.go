@@ -389,3 +389,224 @@ func TestNetworkError(t *testing.T) {
 	assert.True(t, ok)
 	assert.Equal(t, "request_timeout", errorResp.ErrorCode)
 }
+
+func TestHTTPStatusCodeErrors(t *testing.T) {
+	tests := []struct {
+		name           string
+		statusCode     int
+		responseBody   string
+		expectedError  string
+		expectedCode   string
+	}{
+		{
+			name:       "Bad Request - With Error Response",
+			statusCode: http.StatusBadRequest,
+			responseBody: `{
+				"error": "validation_error",
+				"error_description": "Invalid input parameters"
+			}`,
+			expectedError: "Invalid input parameters",
+			expectedCode:  "validation_error",
+		},
+		{
+			name:       "Unauthorized - Empty Response",
+			statusCode: http.StatusUnauthorized,
+			responseBody: "",
+			expectedError: "Authentication failed. Please check your credentials or login again.",
+			expectedCode:  "unauthorized",
+		},
+		{
+			name:       "Forbidden - Empty Response",
+			statusCode: http.StatusForbidden,
+			responseBody: "",
+			expectedError: "You don't have permission to access this resource.",
+			expectedCode:  "forbidden",
+		},
+		{
+			name:       "Not Found - Empty Response",
+			statusCode: http.StatusNotFound,
+			responseBody: "",
+			expectedError: "The requested resource was not found.",
+			expectedCode:  "not_found",
+		},
+		{
+			name:       "Rate Limited - Empty Response",
+			statusCode: http.StatusTooManyRequests,
+			responseBody: "",
+			expectedError: "Too many requests. Please try again later.",
+			expectedCode:  "rate_limited",
+		},
+		{
+			name:       "Server Error - Malformed JSON",
+			statusCode: http.StatusInternalServerError,
+			responseBody: "{malformed json",
+			expectedError: "HTTP error 500 with invalid response format",
+			expectedCode:  "parse_error",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server, client := setupTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(tt.statusCode)
+				_, _ = w.Write([]byte(tt.responseBody))
+			}))
+			defer server.Close()
+
+			_, err := client.GenerateUploadURL(context.Background(), &GenerateUploadURLRequest{
+				Filename: "test.txt",
+				ContentType: "text/plain",
+			})
+
+			require.Error(t, err)
+			errorResp, ok := err.(*ErrorResponse)
+			require.True(t, ok)
+			assert.Equal(t, tt.expectedCode, errorResp.ErrorCode)
+			assert.Equal(t, tt.expectedError, errorResp.Description)
+		})
+	}
+}
+
+func TestTokenProviderScenarios(t *testing.T) {
+	tests := []struct {
+		name          string
+		tokenProvider TokenProvider
+		expectedError string
+	}{
+		{
+			name: "Token Provider Returns Error",
+			tokenProvider: &mockTokenProvider{
+				err: fmt.Errorf("failed to get token"),
+			},
+			expectedError: "failed to get token from provider: failed to get token",
+		},
+		{
+			name: "Token Provider Returns Empty Token",
+			tokenProvider: &mockTokenProvider{
+				token: "",
+			},
+			expectedError: "",  // Should not error, just send request without token
+		},
+		{
+			name: "Token Provider Returns Valid Token",
+			tokenProvider: &mockTokenProvider{
+				token: "valid-token",
+			},
+			expectedError: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server, client := setupTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if tt.tokenProvider != nil {
+					token, _ := tt.tokenProvider.GetToken(context.Background())
+					if token != "" {
+						assert.Equal(t, "Bearer "+token, r.Header.Get("Authorization"))
+					} else {
+						assert.Empty(t, r.Header.Get("Authorization"))
+					}
+				}
+				
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusOK)
+				_, _ = fmt.Fprintln(w, `{
+					"uploadUrl": "https://example.com/upload",
+					"httpMethod": "PUT"
+				}`)
+			}))
+			defer server.Close()
+
+			client.tokenProvider = tt.tokenProvider
+
+			_, err := client.GenerateUploadURL(context.Background(), &GenerateUploadURLRequest{
+				Filename: "test.txt",
+				ContentType: "text/plain",
+			})
+
+			if tt.expectedError != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedError)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestRequestValidation(t *testing.T) {
+	tests := []struct {
+		name          string
+		request       interface{}
+		expectedError string
+	}{
+		{
+			name: "Upload URL - Empty Filename",
+			request: &GenerateUploadURLRequest{
+				Filename: "",
+				ContentType: "text/plain",
+			},
+			expectedError: "filename is required",
+		},
+		{
+			name: "Upload URL - Empty Content Type",
+			request: &GenerateUploadURLRequest{
+				Filename: "test.txt",
+				ContentType: "",
+			},
+			expectedError: "content type is required",
+		},
+		{
+			name: "Download URL - Empty S3 Key",
+			request: &GenerateDownloadURLRequest{
+				S3Key: "",
+			},
+			expectedError: "s3 key is required",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server, client := setupTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusBadRequest)
+				_, _ = fmt.Fprintln(w, `{
+					"error": "validation_error",
+					"error_description": "`+tt.expectedError+`"
+				}`)
+			}))
+			defer server.Close()
+
+			var err error
+			switch req := tt.request.(type) {
+			case *GenerateUploadURLRequest:
+				_, err = client.GenerateUploadURL(context.Background(), req)
+			case *GenerateDownloadURLRequest:
+				_, err = client.GenerateDownloadURL(context.Background(), req)
+			}
+
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tt.expectedError)
+		})
+	}
+}
+
+func TestNetworkTimeoutError(t *testing.T) {
+	client, err := NewClient("http://localhost:12345") // Non-existent server
+	require.NoError(t, err)
+
+	// Set a very short timeout to trigger timeout error
+	client.HTTPClient.Timeout = 1 * time.Millisecond
+
+	_, err = client.GenerateUploadURL(context.Background(), &GenerateUploadURLRequest{
+		Filename: "test.txt",
+		ContentType: "text/plain",
+	})
+
+	require.Error(t, err)
+	errorResp, ok := err.(*ErrorResponse)
+	require.True(t, ok)
+	assert.Equal(t, "request_timeout", errorResp.ErrorCode)
+	assert.Contains(t, errorResp.Description, "The request timed out")
+}
