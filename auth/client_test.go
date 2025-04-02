@@ -1113,3 +1113,138 @@ func TestDeleteClientCredential_NotFound(t *testing.T) {
 	assert.Equal(t, "not_found", errorResp.ErrorCode)
 	assert.Equal(t, "Client credential not found", errorResp.Description)
 }
+
+func TestResendConfirmationCode(t *testing.T) {
+	server, client := setupTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "POST", r.Method)
+		assert.Equal(t, "/auth/signup/resend", r.URL.Path)
+
+		var req struct {
+			Username string `json:"username"`
+		}
+		err := json.NewDecoder(r.Body).Decode(&req)
+		require.NoError(t, err)
+		assert.Equal(t, "test@example.com", req.Username)
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprintln(w, `{
+			"code_delivery_details": {
+				"destination": "t***@e***.com",
+				"delivery_medium": "EMAIL",
+				"attribute_name": "email"
+			}
+		}`)
+	}))
+	defer server.Close()
+
+	details, err := client.ResendConfirmationCode(context.Background(), "test@example.com")
+	require.NoError(t, err)
+	assert.Equal(t, "EMAIL", details.DeliveryMedium)
+	assert.Equal(t, "t***@e***.com", details.Destination)
+	assert.Equal(t, "email", details.AttributeName)
+}
+
+func TestResendConfirmationCode_Error(t *testing.T) {
+	server, client := setupTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Fprintln(w, `{
+			"error": "UserNotFoundException",
+			"error_description": "User does not exist"
+		}`)
+	}))
+	defer server.Close()
+
+	_, err := client.ResendConfirmationCode(context.Background(), "nonexistent@example.com")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "UserNotFoundException")
+}
+
+func TestConfirmSignup(t *testing.T) {
+	server, client := setupTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "POST", r.Method)
+		assert.Equal(t, "/auth/signup/confirm", r.URL.Path)
+
+		var req struct {
+			Username         string `json:"username"`
+			ConfirmationCode string `json:"confirmation_code"`
+		}
+		err := json.NewDecoder(r.Body).Decode(&req)
+		require.NoError(t, err)
+		assert.Equal(t, "test@example.com", req.Username)
+		assert.Equal(t, "123456", req.ConfirmationCode)
+
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	err := client.ConfirmSignup(context.Background(), "test@example.com", "123456")
+	require.NoError(t, err)
+}
+
+func TestConfirmSignup_InvalidCode(t *testing.T) {
+	server, client := setupTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Fprintln(w, `{
+			"error": "CodeMismatchException",
+			"error_description": "Invalid verification code provided"
+		}`)
+	}))
+	defer server.Close()
+
+	err := client.ConfirmSignup(context.Background(), "test@example.com", "invalid")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "CodeMismatchException")
+}
+
+func TestGetUserProfile_Error(t *testing.T) {
+	tests := []struct {
+		name           string
+		statusCode     int
+		response       string
+		expectedError  string
+		setupHandler   func(w http.ResponseWriter, r *http.Request)
+	}{
+		{
+			name:       "Invalid Token",
+			statusCode: http.StatusUnauthorized,
+			response:   `{"error": "invalid_token", "message": "The access token is invalid"}`,
+			expectedError: "invalid_token",
+			setupHandler: func(w http.ResponseWriter, r *http.Request) {
+				assert.Equal(t, "Bearer invalid-token", r.Header.Get("Authorization"))
+			},
+		},
+		{
+			name:       "Server Error",
+			statusCode: http.StatusInternalServerError,
+			response:   `{"error": "internal_error", "message": "Internal server error"}`,
+			expectedError: "internal_error",
+		},
+		{
+			name:       "Malformed Response",
+			statusCode: http.StatusOK,
+			response:   `{invalid json}`,
+			expectedError: "invalid character",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server, client := setupTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if tt.setupHandler != nil {
+					tt.setupHandler(w, r)
+				}
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(tt.statusCode)
+				fmt.Fprintln(w, tt.response)
+			}))
+			defer server.Close()
+
+			_, err := client.GetUserProfile(context.Background(), "invalid-token")
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tt.expectedError)
+		})
+	}
+}
