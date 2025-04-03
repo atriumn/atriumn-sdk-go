@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"path"
+	"strconv"
 	"time"
 )
 
@@ -301,4 +302,58 @@ func (c *Client) do(req *http.Request, v interface{}) (*http.Response, error) {
 	}
 
 	return resp, nil
+}
+
+// GetContentItem retrieves a single content item by ID
+func (c *Client) GetContentItem(ctx context.Context, id string) (*ContentItem, error) {
+	path := fmt.Sprintf("/content/%s", id)
+	httpReq, err := c.newRequest(ctx, "GET", path, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var resp ContentItem
+	_, err = c.do(httpReq, &resp)
+	if err != nil {
+		return nil, err
+	}
+
+	return &resp, nil
+}
+
+// ListContentItems retrieves a list of content items with optional filtering and pagination
+func (c *Client) ListContentItems(ctx context.Context, statusFilter *string, sourceTypeFilter *string, limit *int, nextToken *string) (*ListContentResponse, error) {
+	path := "/content"
+	
+	// Create query parameters
+	q := url.Values{}
+	if statusFilter != nil {
+		q.Add("status", *statusFilter)
+	}
+	if sourceTypeFilter != nil {
+		q.Add("sourceType", *sourceTypeFilter)
+	}
+	if limit != nil {
+		q.Add("limit", strconv.Itoa(*limit))
+	}
+	if nextToken != nil {
+		q.Add("nextToken", *nextToken)
+	}
+
+	// Create request
+	httpReq, err := c.newRequest(ctx, "GET", path, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	// Add query parameters to the URL
+	httpReq.URL.RawQuery = q.Encode()
+
+	var resp ListContentResponse
+	_, err = c.do(httpReq, &resp)
+	if err != nil {
+		return nil, err
+	}
+
+	return &resp, nil
 } 

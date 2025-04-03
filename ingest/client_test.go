@@ -304,4 +304,248 @@ func TestClient_Error(t *testing.T) {
 	if apiErr.Description != "Missing required field" {
 		t.Errorf("Description = %q, want %q", apiErr.Description, "Missing required field")
 	}
+}
+
+func TestClient_GetContentItem(t *testing.T) {
+	expectedResponse := `{
+		"id": "content-123",
+		"tenantId": "tenant-123",
+		"userId": "user-456",
+		"sourceType": "url",
+		"sourceUri": "https://example.com/document.pdf",
+		"s3Key": "tenant-123/content-123.pdf",
+		"status": "processed",
+		"contentType": "application/pdf",
+		"size": 12345,
+		"metadata": {"title": "Test Document"},
+		"createdAt": "2023-04-01T12:34:56Z",
+		"updatedAt": "2023-04-01T12:45:00Z"
+	}`
+	
+	server := setupTestServer(t, http.StatusOK, expectedResponse, func(r *http.Request) {
+		// Validate request
+		if r.Method != "GET" {
+			t.Errorf("Expected GET request, got %s", r.Method)
+		}
+		if r.URL.Path != "/content/content-123" {
+			t.Errorf("Expected path /content/content-123, got %s", r.URL.Path)
+		}
+		if r.Header.Get("Authorization") != "Bearer test-token" {
+			t.Errorf("Expected Authorization: Bearer test-token, got %s", r.Header.Get("Authorization"))
+		}
+	})
+	defer server.Close()
+	
+	client, err := NewClientWithOptions(
+		server.URL,
+		WithTokenProvider(&MockTokenProvider{token: "test-token"}),
+	)
+	if err != nil {
+		t.Fatalf("Failed to create client: %v", err)
+	}
+	
+	contentItem, err := client.GetContentItem(context.Background(), "content-123")
+	if err != nil {
+		t.Fatalf("GetContentItem returned unexpected error: %v", err)
+	}
+	
+	// Validate response
+	if contentItem.ID != "content-123" {
+		t.Errorf("GetContentItem response ID = %q, want %q", contentItem.ID, "content-123")
+	}
+	if contentItem.TenantID != "tenant-123" {
+		t.Errorf("GetContentItem response TenantID = %q, want %q", contentItem.TenantID, "tenant-123")
+	}
+	if contentItem.UserID != "user-456" {
+		t.Errorf("GetContentItem response UserID = %q, want %q", contentItem.UserID, "user-456")
+	}
+	if contentItem.SourceType != "url" {
+		t.Errorf("GetContentItem response SourceType = %q, want %q", contentItem.SourceType, "url")
+	}
+	if contentItem.Status != "processed" {
+		t.Errorf("GetContentItem response Status = %q, want %q", contentItem.Status, "processed")
+	}
+	if contentItem.Size != 12345 {
+		t.Errorf("GetContentItem response Size = %d, want %d", contentItem.Size, 12345)
+	}
+	if contentItem.Metadata["title"] != "Test Document" {
+		t.Errorf("GetContentItem response Metadata[title] = %q, want %q", contentItem.Metadata["title"], "Test Document")
+	}
+}
+
+func TestClient_GetContentItem_NotFound(t *testing.T) {
+	errorResponse := `{"error":"not_found","error_description":"Content item not found"}`
+	
+	server := setupTestServer(t, http.StatusNotFound, errorResponse, nil)
+	defer server.Close()
+	
+	client, _ := NewClient(server.URL)
+	
+	_, err := client.GetContentItem(context.Background(), "non-existent-id")
+	
+	if err == nil {
+		t.Fatal("Expected error but got nil")
+	}
+	
+	apiErr, ok := err.(*ErrorResponse)
+	if !ok {
+		t.Fatalf("Expected *ErrorResponse, got %T", err)
+	}
+	
+	if apiErr.ErrorCode != "not_found" {
+		t.Errorf("ErrorCode = %q, want %q", apiErr.ErrorCode, "not_found")
+	}
+	if apiErr.Description != "Content item not found" {
+		t.Errorf("Description = %q, want %q", apiErr.Description, "Content item not found")
+	}
+}
+
+func TestClient_ListContentItems(t *testing.T) {
+	expectedResponse := `{
+		"items": [
+			{
+				"id": "content-123",
+				"tenantId": "tenant-123",
+				"userId": "user-456",
+				"sourceType": "url",
+				"sourceUri": "https://example.com/document1.pdf",
+				"status": "processed",
+				"contentType": "application/pdf",
+				"size": 12345,
+				"createdAt": "2023-04-01T12:34:56Z",
+				"updatedAt": "2023-04-01T12:45:00Z"
+			},
+			{
+				"id": "content-456",
+				"tenantId": "tenant-123",
+				"userId": "user-456",
+				"sourceType": "text",
+				"status": "processing",
+				"contentType": "text/plain",
+				"size": 5678,
+				"createdAt": "2023-04-02T10:11:12Z",
+				"updatedAt": "2023-04-02T10:11:12Z"
+			}
+		],
+		"nextToken": "next-page-token"
+	}`
+	
+	server := setupTestServer(t, http.StatusOK, expectedResponse, func(r *http.Request) {
+		// Validate request
+		if r.Method != "GET" {
+			t.Errorf("Expected GET request, got %s", r.Method)
+		}
+		if r.URL.Path != "/content" {
+			t.Errorf("Expected path /content, got %s", r.URL.Path)
+		}
+		
+		// Validate query parameters
+		q := r.URL.Query()
+		if status := q.Get("status"); status != "processed" {
+			t.Errorf("Expected status=processed, got %s", status)
+		}
+		if sourceType := q.Get("sourceType"); sourceType != "url" {
+			t.Errorf("Expected sourceType=url, got %s", sourceType)
+		}
+		if limit := q.Get("limit"); limit != "10" {
+			t.Errorf("Expected limit=10, got %s", limit)
+		}
+		if nextToken := q.Get("nextToken"); nextToken != "page-token" {
+			t.Errorf("Expected nextToken=page-token, got %s", nextToken)
+		}
+	})
+	defer server.Close()
+	
+	client, err := NewClient(server.URL)
+	if err != nil {
+		t.Fatalf("Failed to create client: %v", err)
+	}
+	
+	status := "processed"
+	sourceType := "url"
+	limit := 10
+	nextToken := "page-token"
+	
+	resp, err := client.ListContentItems(
+		context.Background(),
+		&status,
+		&sourceType,
+		&limit,
+		&nextToken,
+	)
+	if err != nil {
+		t.Fatalf("ListContentItems returned unexpected error: %v", err)
+	}
+	
+	// Validate response
+	if len(resp.Items) != 2 {
+		t.Fatalf("Expected 2 items, got %d", len(resp.Items))
+	}
+	
+	if resp.NextToken != "next-page-token" {
+		t.Errorf("NextToken = %q, want %q", resp.NextToken, "next-page-token")
+	}
+	
+	// Validate first item
+	item1 := resp.Items[0]
+	if item1.ID != "content-123" {
+		t.Errorf("First item ID = %q, want %q", item1.ID, "content-123")
+	}
+	if item1.SourceType != "url" {
+		t.Errorf("First item SourceType = %q, want %q", item1.SourceType, "url")
+	}
+	if item1.Status != "processed" {
+		t.Errorf("First item Status = %q, want %q", item1.Status, "processed")
+	}
+	
+	// Validate second item
+	item2 := resp.Items[1]
+	if item2.ID != "content-456" {
+		t.Errorf("Second item ID = %q, want %q", item2.ID, "content-456")
+	}
+	if item2.SourceType != "text" {
+		t.Errorf("Second item SourceType = %q, want %q", item2.SourceType, "text")
+	}
+	if item2.Status != "processing" {
+		t.Errorf("Second item Status = %q, want %q", item2.Status, "processing")
+	}
+}
+
+func TestClient_ListContentItems_NoFilters(t *testing.T) {
+	expectedResponse := `{"items":[],"nextToken":""}`
+	
+	server := setupTestServer(t, http.StatusOK, expectedResponse, func(r *http.Request) {
+		// Validate request
+		if r.Method != "GET" {
+			t.Errorf("Expected GET request, got %s", r.Method)
+		}
+		if r.URL.Path != "/content" {
+			t.Errorf("Expected path /content, got %s", r.URL.Path)
+		}
+		
+		// Ensure no query parameters are present
+		if len(r.URL.RawQuery) > 0 {
+			t.Errorf("Expected no query parameters, got %s", r.URL.RawQuery)
+		}
+	})
+	defer server.Close()
+	
+	client, err := NewClient(server.URL)
+	if err != nil {
+		t.Fatalf("Failed to create client: %v", err)
+	}
+	
+	resp, err := client.ListContentItems(context.Background(), nil, nil, nil, nil)
+	if err != nil {
+		t.Fatalf("ListContentItems returned unexpected error: %v", err)
+	}
+	
+	// Validate response
+	if len(resp.Items) != 0 {
+		t.Fatalf("Expected 0 items, got %d", len(resp.Items))
+	}
+	
+	if resp.NextToken != "" {
+		t.Errorf("NextToken = %q, want empty string", resp.NextToken)
+	}
 } 

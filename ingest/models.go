@@ -40,6 +40,28 @@ type IngestResponse struct {
 	Timestamp  string `json:"timestamp"`
 }
 
+// ContentItem represents a content item returned by the API
+type ContentItem struct {
+	ID          string            `json:"id"`
+	TenantID    string            `json:"tenantId"`
+	UserID      string            `json:"userId,omitempty"`
+	SourceType  string            `json:"sourceType"`
+	SourceURI   string            `json:"sourceUri,omitempty"`
+	S3Key       string            `json:"s3Key,omitempty"`
+	Status      string            `json:"status"`
+	ContentType string            `json:"contentType,omitempty"`
+	Size        int64             `json:"size,omitempty"`
+	Metadata    map[string]string `json:"metadata,omitempty"`
+	CreatedAt   string            `json:"createdAt"`
+	UpdatedAt   string            `json:"updatedAt"`
+}
+
+// ListContentResponse represents the response from the GET /content endpoint
+type ListContentResponse struct {
+	Items     []ContentItem `json:"items"`
+	NextToken string        `json:"nextToken,omitempty"`
+}
+
 // ErrorResponse represents an error response from the API
 type ErrorResponse struct {
 	ErrorCode   string `json:"error"`
