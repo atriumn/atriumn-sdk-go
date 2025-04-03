@@ -334,6 +334,36 @@ func TestGenerateDownloadURL_Error(t *testing.T) {
 	assert.Equal(t, "The specified key does not exist", errorResp.Description)
 }
 
+func TestGenerateDownloadURLFromKey_Success(t *testing.T) {
+	// Create a test server
+	server, client := setupTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "POST", r.Method)
+		assert.Equal(t, "/generate-download-url", r.URL.Path)
+		assert.Equal(t, "application/json", r.Header.Get("Content-Type"))
+
+		// Verify request body
+		var req GenerateDownloadURLRequest
+		err := json.NewDecoder(r.Body).Decode(&req)
+		assert.NoError(t, err)
+		assert.Equal(t, "tenant-123/files/document.pdf", req.S3Key)
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = fmt.Fprintln(w, `{
+			"downloadUrl": "https://example-bucket.s3.amazonaws.com/tenant-123/files/document.pdf?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=...",
+			"httpMethod": "GET"
+		}`)
+	}))
+	defer server.Close()
+
+	resp, err := client.GenerateDownloadURLFromKey(context.Background(), "tenant-123/files/document.pdf")
+
+	assert.NoError(t, err)
+	assert.NotNil(t, resp)
+	assert.Contains(t, resp.DownloadURL, "https://example-bucket.s3.amazonaws.com/tenant-123/files/document.pdf?X-Amz-Algorithm=AWS4-HMAC-SHA256")
+	assert.Equal(t, "GET", resp.HTTPMethod)
+}
+
 func TestErrorResponse(t *testing.T) {
 	tests := []struct {
 		name        string

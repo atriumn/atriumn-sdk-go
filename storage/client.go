@@ -255,3 +255,11 @@ func (c *Client) GenerateDownloadURL(ctx context.Context, request *GenerateDownl
 
 	return &resp, nil
 }
+
+// GenerateDownloadURLFromKey generates a pre-signed URL for downloading a file from storage using the S3 key directly
+func (c *Client) GenerateDownloadURLFromKey(ctx context.Context, s3Key string) (*GenerateDownloadURLResponse, error) {
+	request := &GenerateDownloadURLRequest{
+		S3Key: s3Key,
+	}
+	return c.GenerateDownloadURL(ctx, request)
+}
