@@ -678,3 +678,61 @@ func TestNetworkTimeoutError(t *testing.T) {
 	assert.Equal(t, "request_timeout", errorResp.ErrorCode)
 	assert.Contains(t, errorResp.Description, "The request timed out")
 }
+
+func TestURLConstruction(t *testing.T) {
+	tests := []struct {
+		name     string
+		baseURL  string
+		path     string
+		expected string
+	}{
+		{
+			name:     "Simple path",
+			baseURL:  "https://example.com",
+			path:     "/generate-upload-url",
+			expected: "https://example.com/generate-upload-url",
+		},
+		{
+			name:     "Path without leading slash",
+			baseURL:  "https://example.com",
+			path:     "generate-upload-url",
+			expected: "https://example.com/generate-upload-url",
+		},
+		{
+			name:     "Base URL with path",
+			baseURL:  "https://example.com/api/v1",
+			path:     "/generate-upload-url",
+			expected: "https://example.com/api/v1/generate-upload-url",
+		},
+		{
+			name:     "Base URL with path and path without leading slash",
+			baseURL:  "https://example.com/api/v1",
+			path:     "generate-upload-url",
+			expected: "https://example.com/api/v1/generate-upload-url",
+		},
+		{
+			name:     "Base URL with trailing slash",
+			baseURL:  "https://example.com/",
+			path:     "generate-upload-url",
+			expected: "https://example.com/generate-upload-url",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client, err := NewClient(tt.baseURL)
+			if err != nil {
+				t.Fatalf("Failed to create client: %v", err)
+			}
+
+			req, err := client.newRequest(context.Background(), "GET", tt.path, nil)
+			if err != nil {
+				t.Fatalf("Failed to create request: %v", err)
+			}
+
+			if req.URL.String() != tt.expected {
+				t.Errorf("Expected URL %q, got %q", tt.expected, req.URL.String())
+			}
+		})
+	}
+}

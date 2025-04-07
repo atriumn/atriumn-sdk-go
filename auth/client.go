@@ -208,8 +208,7 @@ func (c *Client) DeleteClientCredential(ctx context.Context, id string) error {
 // newRequest creates an API request
 func (c *Client) newRequest(ctx context.Context, method, path string, body interface{}) (*http.Request, error) {
 	// Create the URL for the request
-	u := *c.BaseURL
-	u.Path = path
+	u := c.BaseURL.JoinPath(path)
 
 	var buf io.ReadWriter
 	if body != nil {

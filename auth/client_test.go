@@ -1256,3 +1256,61 @@ func TestGetUserProfile_Error(t *testing.T) {
 		})
 	}
 }
+
+func TestURLConstruction(t *testing.T) {
+	tests := []struct {
+		name     string
+		baseURL  string
+		path     string
+		expected string
+	}{
+		{
+			name:     "Simple path",
+			baseURL:  "https://example.com",
+			path:     "/users",
+			expected: "https://example.com/users",
+		},
+		{
+			name:     "Path without leading slash",
+			baseURL:  "https://example.com",
+			path:     "users",
+			expected: "https://example.com/users",
+		},
+		{
+			name:     "Base URL with path",
+			baseURL:  "https://example.com/api/v1",
+			path:     "/users",
+			expected: "https://example.com/api/v1/users",
+		},
+		{
+			name:     "Base URL with path and path without leading slash",
+			baseURL:  "https://example.com/api/v1",
+			path:     "users",
+			expected: "https://example.com/api/v1/users",
+		},
+		{
+			name:     "Base URL with trailing slash",
+			baseURL:  "https://example.com/",
+			path:     "users",
+			expected: "https://example.com/users",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client, err := NewClient(tt.baseURL)
+			if err != nil {
+				t.Fatalf("Failed to create client: %v", err)
+			}
+
+			req, err := client.newRequest(context.Background(), "GET", tt.path, nil)
+			if err != nil {
+				t.Fatalf("Failed to create request: %v", err)
+			}
+
+			if req.URL.String() != tt.expected {
+				t.Errorf("Expected URL %q, got %q", tt.expected, req.URL.String())
+			}
+		})
+	}
+}

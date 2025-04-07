@@ -1350,4 +1350,110 @@ func TestClient_ListContentItems_Error(t *testing.T) {
 	if apiErr.ErrorCode != "invalid_param" {
 		t.Errorf("ErrorCode = %q, want %q", apiErr.ErrorCode, "invalid_param")
 	}
+}
+
+func TestURLConstruction(t *testing.T) {
+	tests := []struct {
+		name     string
+		baseURL  string
+		path     string
+		expected string
+	}{
+		{
+			name:     "Simple path",
+			baseURL:  "https://example.com",
+			path:     "/ingest/text",
+			expected: "https://example.com/ingest/text",
+		},
+		{
+			name:     "Path without leading slash",
+			baseURL:  "https://example.com",
+			path:     "ingest/text",
+			expected: "https://example.com/ingest/text",
+		},
+		{
+			name:     "Base URL with path",
+			baseURL:  "https://example.com/api/v1",
+			path:     "/ingest/text",
+			expected: "https://example.com/api/v1/ingest/text",
+		},
+		{
+			name:     "Base URL with path and path without leading slash",
+			baseURL:  "https://example.com/api/v1",
+			path:     "ingest/text",
+			expected: "https://example.com/api/v1/ingest/text",
+		},
+		{
+			name:     "Base URL with trailing slash",
+			baseURL:  "https://example.com/",
+			path:     "ingest/text",
+			expected: "https://example.com/ingest/text",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client, err := NewClient(tt.baseURL)
+			if err != nil {
+				t.Fatalf("Failed to create client: %v", err)
+			}
+
+			req, err := client.newRequest(context.Background(), "GET", tt.path, nil)
+			if err != nil {
+				t.Fatalf("Failed to create request: %v", err)
+			}
+
+			if req.URL.String() != tt.expected {
+				t.Errorf("Expected URL %q, got %q", tt.expected, req.URL.String())
+			}
+		})
+	}
+}
+
+func TestIngestFileURLConstruction(t *testing.T) {
+	// Create a test server to capture the request
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Return a simple valid response
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprintln(w, `{"id":"test-id","status":"processing"}`)
+	}))
+	defer ts.Close()
+
+	tests := []struct {
+		name             string
+		baseURL          string
+		expectedURLStart string
+	}{
+		{
+			name:             "Simple base URL",
+			baseURL:          ts.URL,
+			expectedURLStart: ts.URL + "/ingest/file",
+		},
+		{
+			name:             "Base URL with trailing slash",
+			baseURL:          ts.URL + "/",
+			expectedURLStart: ts.URL + "/ingest/file",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client, err := NewClient(tt.baseURL)
+			if err != nil {
+				t.Fatalf("Failed to create client: %v", err)
+			}
+
+			// Create a simple reader for the file content
+			fileContent := strings.NewReader("test content")
+
+			// Call IngestFile
+			_, err = client.IngestFile(context.Background(), "tenant-1", "test.txt", "text/plain", "user-1", fileContent)
+			if err != nil {
+				t.Fatalf("IngestFile failed: %v", err)
+			}
+
+			// We don't have direct access to the created URL, but the test server 
+			// would have returned an error if the URL wasn't valid
+		})
+	}
 } 

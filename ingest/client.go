@@ -12,7 +12,6 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/url"
-	"path"
 	"strconv"
 	"time"
 
@@ -185,8 +184,7 @@ func (c *Client) IngestFile(ctx context.Context, tenantID string, filename strin
 	}
 
 	// Create request
-	u := *c.BaseURL
-	u.Path = path.Join(u.Path, "/ingest/file")
+	u := c.BaseURL.JoinPath("ingest", "file")
 
 	req, err := http.NewRequestWithContext(ctx, "POST", u.String(), body)
 	if err != nil {
@@ -221,8 +219,7 @@ func (c *Client) IngestFile(ctx context.Context, tenantID string, filename strin
 
 // newRequest creates an API request with the specified method, path, and body
 func (c *Client) newRequest(ctx context.Context, method, path string, body interface{}) (*http.Request, error) {
-	u := *c.BaseURL
-	u.Path = path
+	u := c.BaseURL.JoinPath(path)
 
 	var buf io.ReadWriter
 	if body != nil {

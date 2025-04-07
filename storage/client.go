@@ -109,17 +109,12 @@ func NewClientWithOptions(baseURL string, options ...ClientOption) (*Client, err
 
 // newRequest creates an API request with the specified method, path, and body
 func (c *Client) newRequest(ctx context.Context, method, path string, body interface{}) (*http.Request, error) {
-	rel, err := url.Parse(path)
-	if err != nil {
-		return nil, err
-	}
-
-	u := c.BaseURL.ResolveReference(rel)
+	u := c.BaseURL.JoinPath(path)
 
 	var buf io.ReadWriter
 	if body != nil {
 		buf = new(bytes.Buffer)
-		err = json.NewEncoder(buf).Encode(body)
+		err := json.NewEncoder(buf).Encode(body)
 		if err != nil {
 			return nil, err
 		}
