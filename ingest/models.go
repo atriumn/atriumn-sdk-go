@@ -1,9 +1,13 @@
 // Package ingest provides a Go client for interacting with the Atriumn Ingest API.
+// It enables uploading and managing various types of content (text, URLs, files)
+// through a simple, idiomatic Go interface.
 package ingest
 
 import "fmt"
 
-// IngestTextRequest represents a request to ingest text content
+// IngestTextRequest represents a request to ingest text content.
+// It contains the text content to be ingested along with optional
+// tenant ID, user ID, and metadata.
 type IngestTextRequest struct {
 	TenantID string `json:"tenantId,omitempty"`
 	UserID   string `json:"userId,omitempty"`
@@ -11,7 +15,9 @@ type IngestTextRequest struct {
 	Metadata map[string]string `json:"metadata,omitempty"`
 }
 
-// IngestURLRequest represents a request to ingest content from a URL
+// IngestURLRequest represents a request to ingest content from a URL.
+// It contains the URL to be scraped and ingested along with optional
+// tenant ID, user ID, and metadata.
 type IngestURLRequest struct {
 	TenantID string `json:"tenantId,omitempty"`
 	UserID   string `json:"userId,omitempty"`
@@ -19,9 +25,10 @@ type IngestURLRequest struct {
 	Metadata map[string]string `json:"metadata,omitempty"`
 }
 
-// IngestFileRequest represents a request to ingest content from a file
+// IngestFileRequest represents a request to ingest content from a file.
 // This is not directly used in JSON marshaling/unmarshaling but represents
-// the form data fields that will be sent in the multipart/form-data request
+// the form data fields that will be sent in the multipart/form-data request.
+// It contains metadata about the file being uploaded.
 type IngestFileRequest struct {
 	TenantID string
 	UserID   string
@@ -29,7 +36,9 @@ type IngestFileRequest struct {
 	Metadata map[string]string
 }
 
-// IngestResponse represents the response from the ingest endpoints
+// IngestResponse represents the response from the ingest endpoints.
+// It contains details about the ingested content, including its unique ID,
+// processing status, and associated metadata.
 type IngestResponse struct {
 	ID         string `json:"id"`
 	Status     string `json:"status"`
@@ -40,7 +49,9 @@ type IngestResponse struct {
 	Timestamp  string `json:"timestamp"`
 }
 
-// ContentItem represents a content item returned by the API
+// ContentItem represents a content item returned by the API.
+// It contains comprehensive metadata about the ingested content,
+// including its source, processing status, and storage information.
 type ContentItem struct {
 	ID          string            `json:"id"`
 	TenantID    string            `json:"tenantId"`
@@ -56,19 +67,22 @@ type ContentItem struct {
 	UpdatedAt   string            `json:"updatedAt"`
 }
 
-// ListContentResponse represents the response from the GET /content endpoint
+// ListContentResponse represents the response from the GET /content endpoint.
+// It contains a list of content items and an optional token for pagination.
 type ListContentResponse struct {
 	Items     []ContentItem `json:"items"`
 	NextToken string        `json:"nextToken,omitempty"`
 }
 
-// ErrorResponse represents an error response from the API
+// ErrorResponse represents an error response from the API.
+// It contains the error code and an optional description returned by the Atriumn Ingest API.
 type ErrorResponse struct {
 	ErrorCode   string `json:"error"`
 	Description string `json:"error_description,omitempty"`
 }
 
-// Error satisfies the error interface
+// Error satisfies the error interface by returning a formatted error message.
+// If a description is available, it will be included in the error message.
 func (e *ErrorResponse) Error() string {
 	if e.Description != "" {
 		return fmt.Sprintf("%s: %s", e.ErrorCode, e.Description)

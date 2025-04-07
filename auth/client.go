@@ -1,4 +1,6 @@
 // Package auth provides a Go client for interacting with the Atriumn Auth API.
+// It includes functionality for managing client credentials, user authentication,
+// and accessing user profiles through a simple, idiomatic Go interface.
 package auth
 
 import (
@@ -20,7 +22,9 @@ const (
 	DefaultUserAgent = "atriumn-auth-client/1.0"
 )
 
-// Client is the main API client for Atriumn Auth Service
+// Client is the main API client for Atriumn Auth Service.
+// It handles communication with the API endpoints, including
+// authentication, client credential management, and user operations.
 type Client struct {
 	// BaseURL is the base URL of the Atriumn Auth API
 	BaseURL *url.URL
@@ -32,7 +36,8 @@ type Client struct {
 	UserAgent string
 }
 
-// NewClient creates a new Atriumn Auth API client
+// NewClient creates a new Atriumn Auth API client with the specified base URL.
+// It returns an error if the provided URL cannot be parsed.
 func NewClient(baseURL string) (*Client, error) {
 	parsedURL, err := url.Parse(baseURL)
 	if err != nil {
@@ -46,24 +51,30 @@ func NewClient(baseURL string) (*Client, error) {
 	}, nil
 }
 
-// ClientOption is a function that configures a Client
+// ClientOption is a function that configures a Client.
+// It is used with NewClientWithOptions to customize the client behavior.
 type ClientOption func(*Client)
 
-// WithHTTPClient sets the HTTP client for the API client
+// WithHTTPClient sets the HTTP client for the API client.
+// This can be used to customize timeouts, transport settings, or to inject
+// middleware/interceptors for testing or monitoring.
 func WithHTTPClient(httpClient *http.Client) ClientOption {
 	return func(c *Client) {
 		c.HTTPClient = httpClient
 	}
 }
 
-// WithUserAgent sets the user agent for the API client
+// WithUserAgent sets the user agent for the API client.
+// This string is sent with each request to identify the client.
 func WithUserAgent(userAgent string) ClientOption {
 	return func(c *Client) {
 		c.UserAgent = userAgent
 	}
 }
 
-// NewClientWithOptions creates a new client with custom options
+// NewClientWithOptions creates a new client with custom options.
+// It allows for flexible configuration of the client through functional options.
+// Returns an error if the base URL is invalid.
 func NewClientWithOptions(baseURL string, options ...ClientOption) (*Client, error) {
 	client, err := NewClient(baseURL)
 	if err != nil {
@@ -77,7 +88,8 @@ func NewClientWithOptions(baseURL string, options ...ClientOption) (*Client, err
 	return client, nil
 }
 
-// CreateClientCredential creates a new client credential
+// CreateClientCredential creates a new client credential with the provided parameters.
+// It returns the created credential including the client ID and secret, or an error if the operation fails.
 func (c *Client) CreateClientCredential(ctx context.Context, req ClientCredentialCreateRequest) (*ClientCredentialCreateResponse, error) {
 	httpReq, err := c.newRequest(ctx, "POST", "/admin/credentials", req)
 	if err != nil {
@@ -97,7 +109,9 @@ func (c *Client) CreateClientCredential(ctx context.Context, req ClientCredentia
 	return &resp, nil
 }
 
-// ListClientCredentials lists client credentials with optional filters
+// ListClientCredentials lists client credentials with optional filters.
+// Parameters allow filtering by issuedTo, tenantID, scope, and active status.
+// Returns a list of matching credentials or an error if the operation fails.
 func (c *Client) ListClientCredentials(ctx context.Context, issuedToFilter, tenantIDFilter, scopeFilter string, activeOnly, inactiveOnly bool) (*ListClientCredentialsResponse, error) {
 	httpReq, err := c.newRequest(ctx, "GET", "/admin/credentials", nil)
 	if err != nil {
@@ -131,7 +145,8 @@ func (c *Client) ListClientCredentials(ctx context.Context, issuedToFilter, tena
 	return &resp, nil
 }
 
-// GetClientCredential gets a client credential by ID
+// GetClientCredential gets a client credential by its ID.
+// Returns the credential details or an error if not found or operation fails.
 func (c *Client) GetClientCredential(ctx context.Context, id string) (*ClientCredentialResponse, error) {
 	path := fmt.Sprintf("/admin/credentials/%s", id)
 	httpReq, err := c.newRequest(ctx, "GET", path, nil)
@@ -148,7 +163,9 @@ func (c *Client) GetClientCredential(ctx context.Context, id string) (*ClientCre
 	return &resp, nil
 }
 
-// UpdateClientCredential updates a client credential
+// UpdateClientCredential updates a client credential with the specified ID.
+// The req parameter specifies which fields to update.
+// Returns the updated credential details or an error if operation fails.
 func (c *Client) UpdateClientCredential(ctx context.Context, id string, req ClientCredentialUpdateRequest) (*ClientCredentialResponse, error) {
 	path := fmt.Sprintf("/admin/credentials/%s", id)
 	httpReq, err := c.newRequest(ctx, "PATCH", path, req)
@@ -165,7 +182,8 @@ func (c *Client) UpdateClientCredential(ctx context.Context, id string, req Clie
 	return &resp, nil
 }
 
-// DeleteClientCredential deletes a client credential
+// DeleteClientCredential deletes a client credential with the specified ID.
+// Returns an error if the deletion fails or the credential does not exist.
 func (c *Client) DeleteClientCredential(ctx context.Context, id string) error {
 	path := fmt.Sprintf("/admin/credentials/%s", id)
 	httpReq, err := c.newRequest(ctx, "DELETE", path, nil)
@@ -248,7 +266,8 @@ func (c *Client) do(req *http.Request, v interface{}) (*http.Response, error) {
 	return resp, nil
 }
 
-// Health checks if the auth service is healthy
+// Health checks the health status of the Auth API.
+// Returns the service health status or an error if the operation fails.
 func (c *Client) Health(ctx context.Context) (*HealthResponse, error) {
 	req, err := c.newRequest(ctx, "GET", "/health", nil)
 	if err != nil {
@@ -264,7 +283,9 @@ func (c *Client) Health(ctx context.Context) (*HealthResponse, error) {
 	return &resp, nil
 }
 
-// GetClientCredentialsToken gets a token using client credentials
+// GetClientCredentialsToken obtains an OAuth token using client credentials flow.
+// Parameters include clientID, clientSecret, and optional scope.
+// Returns a token response or an error if authentication fails.
 func (c *Client) GetClientCredentialsToken(ctx context.Context, clientID, clientSecret, scope string) (*TokenResponse, error) {
 	tokenReq := ClientCredentialsRequest{
 		GrantType:    "client_credentials",
@@ -287,7 +308,8 @@ func (c *Client) GetClientCredentialsToken(ctx context.Context, clientID, client
 	return &resp, nil
 }
 
-// SignupUser signs up a new user
+// SignupUser registers a new user with email, password, and optional attributes.
+// Returns a signup response containing the user ID, or an error if signup fails.
 func (c *Client) SignupUser(ctx context.Context, email, password string, attributes map[string]string) (*UserSignupResponse, error) {
 	signupReq := UserSignupRequest{
 		Email:      email,
@@ -309,7 +331,8 @@ func (c *Client) SignupUser(ctx context.Context, email, password string, attribu
 	return &resp, nil
 }
 
-// ConfirmSignup confirms a user signup
+// ConfirmSignup confirms a user registration with the verification code.
+// Returns an error if confirmation fails or the code is invalid.
 func (c *Client) ConfirmSignup(ctx context.Context, username, code string) error {
 	confirmReq := ConfirmSignupRequest{
 		Username:         username,
@@ -325,7 +348,8 @@ func (c *Client) ConfirmSignup(ctx context.Context, username, code string) error
 	return err
 }
 
-// ResendConfirmationCode resends a confirmation code
+// ResendConfirmationCode resends the confirmation code to the specified user.
+// Returns details about the code delivery or an error if the operation fails.
 func (c *Client) ResendConfirmationCode(ctx context.Context, username string) (*CodeDeliveryDetails, error) {
 	resendReq := ResendConfirmationCodeRequest{
 		Username: username,
@@ -347,7 +371,8 @@ func (c *Client) ResendConfirmationCode(ctx context.Context, username string) (*
 	return &resp.CodeDeliveryDetails, nil
 }
 
-// LoginUser logs in a user
+// LoginUser authenticates a user with username and password.
+// Returns a token response if authentication succeeds, or an error if it fails.
 func (c *Client) LoginUser(ctx context.Context, username, password string) (*TokenResponse, error) {
 	loginReq := UserLoginRequest{
 		Username: username,
@@ -368,7 +393,8 @@ func (c *Client) LoginUser(ctx context.Context, username, password string) (*Tok
 	return &resp, nil
 }
 
-// LogoutUser logs out a user
+// LogoutUser logs out a user by invalidating their access token.
+// Returns an error if the logout operation fails.
 func (c *Client) LogoutUser(ctx context.Context, accessToken string) error {
 	logoutReq := UserLogoutRequest{
 		AccessToken: accessToken,
@@ -383,7 +409,8 @@ func (c *Client) LogoutUser(ctx context.Context, accessToken string) error {
 	return err
 }
 
-// RequestPasswordReset requests a password reset
+// RequestPasswordReset initiates a password reset process for the specified email.
+// Returns password reset response with delivery details, or an error if the operation fails.
 func (c *Client) RequestPasswordReset(ctx context.Context, email string) (*PasswordResetResponse, error) {
 	resetReq := PasswordResetRequest{
 		Email: email,
@@ -403,7 +430,8 @@ func (c *Client) RequestPasswordReset(ctx context.Context, email string) (*Passw
 	return &resp, nil
 }
 
-// ConfirmPasswordReset confirms a password reset
+// ConfirmPasswordReset completes a password reset with the verification code and new password.
+// Returns an error if the password reset fails or the code is invalid.
 func (c *Client) ConfirmPasswordReset(ctx context.Context, email, code, newPassword string) error {
 	confirmReq := ConfirmPasswordResetRequest{
 		Email:       email,
@@ -420,7 +448,9 @@ func (c *Client) ConfirmPasswordReset(ctx context.Context, email, code, newPassw
 	return err
 }
 
-// GetUserProfile gets a user's profile
+// GetUserProfile retrieves the profile of the authenticated user.
+// Requires a valid access token for authorization.
+// Returns the user profile or an error if retrieval fails.
 func (c *Client) GetUserProfile(ctx context.Context, accessToken string) (*UserProfileResponse, error) {
 	req, err := c.newRequest(ctx, "GET", "/auth/me", nil)
 	if err != nil {

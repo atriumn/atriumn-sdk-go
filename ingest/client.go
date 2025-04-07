@@ -1,4 +1,6 @@
 // Package ingest provides a Go client for interacting with the Atriumn Ingest API.
+// It enables uploading and managing various types of content (text, URLs, files)
+// through a simple, idiomatic Go interface.
 package ingest
 
 import (
@@ -23,12 +25,15 @@ const (
 	DefaultUserAgent = "atriumn-ingest-client/1.0"
 )
 
-// TokenProvider defines an interface for retrieving authentication tokens
+// TokenProvider defines an interface for retrieving authentication tokens.
+// Implementations should retrieve and return valid bearer tokens for the Atriumn API.
 type TokenProvider interface {
 	GetToken(ctx context.Context) (string, error) // Returns the Bearer token string
 }
 
-// Client is the main API client for Atriumn Ingest Service
+// Client is the main API client for Atriumn Ingest Service.
+// It handles communication with the API endpoints for content ingestion
+// and retrieval operations.
 type Client struct {
 	// BaseURL is the base URL of the Atriumn Ingest API
 	BaseURL *url.URL
@@ -43,7 +48,8 @@ type Client struct {
 	tokenProvider TokenProvider
 }
 
-// NewClient creates a new Atriumn Ingest API client
+// NewClient creates a new Atriumn Ingest API client with the specified base URL.
+// It returns an error if the provided URL cannot be parsed.
 func NewClient(baseURL string) (*Client, error) {
 	parsedURL, err := url.Parse(baseURL)
 	if err != nil {
@@ -57,31 +63,38 @@ func NewClient(baseURL string) (*Client, error) {
 	}, nil
 }
 
-// ClientOption is a function that configures a Client
+// ClientOption is a function that configures a Client.
+// It is used with NewClientWithOptions to customize the client behavior.
 type ClientOption func(*Client)
 
-// WithHTTPClient sets the HTTP client for the API client
+// WithHTTPClient sets the HTTP client for the API client.
+// This can be used to customize timeouts, transport settings, or to inject
+// middleware/interceptors for testing or monitoring.
 func WithHTTPClient(httpClient *http.Client) ClientOption {
 	return func(c *Client) {
 		c.HTTPClient = httpClient
 	}
 }
 
-// WithUserAgent sets the user agent for the API client
+// WithUserAgent sets the user agent for the API client.
+// This string is sent with each request to identify the client.
 func WithUserAgent(userAgent string) ClientOption {
 	return func(c *Client) {
 		c.UserAgent = userAgent
 	}
 }
 
-// WithTokenProvider sets the token provider for the API client
+// WithTokenProvider sets the token provider for the API client.
+// The token provider is used to obtain authentication tokens for API requests.
 func WithTokenProvider(tp TokenProvider) ClientOption {
 	return func(c *Client) {
 		c.tokenProvider = tp
 	}
 }
 
-// NewClientWithOptions creates a new client with custom options
+// NewClientWithOptions creates a new client with custom options.
+// It allows for flexible configuration of the client through functional options.
+// Returns an error if the base URL is invalid.
 func NewClientWithOptions(baseURL string, options ...ClientOption) (*Client, error) {
 	client, err := NewClient(baseURL)
 	if err != nil {
@@ -95,7 +108,9 @@ func NewClientWithOptions(baseURL string, options ...ClientOption) (*Client, err
 	return client, nil
 }
 
-// IngestText ingests text content through the Atriumn Ingest API
+// IngestText ingests text content through the Atriumn Ingest API.
+// The request parameter contains the text to ingest along with metadata.
+// Returns an ingest response with details about the ingested content or an error.
 func (c *Client) IngestText(ctx context.Context, request *IngestTextRequest) (*IngestResponse, error) {
 	httpReq, err := c.newRequest(ctx, "POST", "/ingest/text", request)
 	if err != nil {
@@ -111,7 +126,9 @@ func (c *Client) IngestText(ctx context.Context, request *IngestTextRequest) (*I
 	return &resp, nil
 }
 
-// IngestURL ingests content from a URL through the Atriumn Ingest API
+// IngestURL ingests content from a URL through the Atriumn Ingest API.
+// The request parameter contains the URL to ingest along with metadata.
+// Returns an ingest response with details about the ingested content or an error.
 func (c *Client) IngestURL(ctx context.Context, request *IngestURLRequest) (*IngestResponse, error) {
 	httpReq, err := c.newRequest(ctx, "POST", "/ingest/url", request)
 	if err != nil {
@@ -127,7 +144,10 @@ func (c *Client) IngestURL(ctx context.Context, request *IngestURLRequest) (*Ing
 	return &resp, nil
 }
 
-// IngestFile ingests content from a file through the Atriumn Ingest API
+// IngestFile ingests content from a file through the Atriumn Ingest API.
+// Parameters include tenant ID, filename, content type, user ID, and a reader
+// providing the file content to be uploaded.
+// Returns an ingest response with details about the ingested file or an error.
 func (c *Client) IngestFile(ctx context.Context, tenantID string, filename string, contentType string, userID string, fileReader io.Reader) (*IngestResponse, error) {
 	// Create multipart writer
 	body := &bytes.Buffer{}
@@ -304,7 +324,8 @@ func (c *Client) do(req *http.Request, v interface{}) (*http.Response, error) {
 	return resp, nil
 }
 
-// GetContentItem retrieves a single content item by ID
+// GetContentItem retrieves a content item by its ID.
+// Returns the content item details or an error if not found or operation fails.
 func (c *Client) GetContentItem(ctx context.Context, id string) (*ContentItem, error) {
 	path := fmt.Sprintf("/content/%s", id)
 	httpReq, err := c.newRequest(ctx, "GET", path, nil)
@@ -321,7 +342,9 @@ func (c *Client) GetContentItem(ctx context.Context, id string) (*ContentItem, e
 	return &resp, nil
 }
 
-// ListContentItems retrieves a list of content items with optional filtering and pagination
+// ListContentItems retrieves a list of content items with optional filtering.
+// Parameters allow filtering by status, source type, and pagination through limit and next token.
+// Returns a list of content items or an error if the operation fails.
 func (c *Client) ListContentItems(ctx context.Context, statusFilter *string, sourceTypeFilter *string, limit *int, nextToken *string) (*ListContentResponse, error) {
 	path := "/content"
 	

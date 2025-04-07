@@ -1,4 +1,6 @@
 // Package storage provides a Go client for interacting with the Atriumn Storage API.
+// It enables generating pre-signed URLs for uploading and downloading files
+// through a simple, idiomatic Go interface.
 package storage
 
 import (
@@ -21,11 +23,14 @@ const (
 )
 
 // TokenProvider defines an interface for retrieving authentication tokens.
+// Implementations should retrieve and return valid bearer tokens for the Atriumn API.
 type TokenProvider interface {
 	GetToken(ctx context.Context) (string, error) // Returns the Bearer token string
 }
 
-// Client is the main API client for Atriumn Storage Service
+// Client is the main API client for Atriumn Storage Service.
+// It handles communication with the API endpoints for generating
+// pre-signed URLs for file uploads and downloads.
 type Client struct {
 	// BaseURL is the base URL of the Atriumn Storage API
 	BaseURL *url.URL
@@ -40,7 +45,8 @@ type Client struct {
 	tokenProvider TokenProvider
 }
 
-// NewClient creates a new Atriumn Storage API client
+// NewClient creates a new Atriumn Storage API client with the specified base URL.
+// It returns an error if the provided URL cannot be parsed.
 func NewClient(baseURL string) (*Client, error) {
 	parsedURL, err := url.Parse(baseURL)
 	if err != nil {
@@ -54,31 +60,38 @@ func NewClient(baseURL string) (*Client, error) {
 	}, nil
 }
 
-// ClientOption is a function that configures a Client
+// ClientOption is a function that configures a Client.
+// It is used with NewClientWithOptions to customize the client behavior.
 type ClientOption func(*Client)
 
-// WithHTTPClient sets the HTTP client for the API client
+// WithHTTPClient sets the HTTP client for the API client.
+// This can be used to customize timeouts, transport settings, or to inject
+// middleware/interceptors for testing or monitoring.
 func WithHTTPClient(httpClient *http.Client) ClientOption {
 	return func(c *Client) {
 		c.HTTPClient = httpClient
 	}
 }
 
-// WithUserAgent sets the user agent for the API client
+// WithUserAgent sets the user agent for the API client.
+// This string is sent with each request to identify the client.
 func WithUserAgent(userAgent string) ClientOption {
 	return func(c *Client) {
 		c.UserAgent = userAgent
 	}
 }
 
-// WithTokenProvider sets the token provider for the API client
+// WithTokenProvider sets the token provider for the API client.
+// The token provider is used to obtain authentication tokens for API requests.
 func WithTokenProvider(tp TokenProvider) ClientOption {
 	return func(c *Client) {
 		c.tokenProvider = tp
 	}
 }
 
-// NewClientWithOptions creates a new client with custom options
+// NewClientWithOptions creates a new client with custom options.
+// It allows for flexible configuration of the client through functional options.
+// Returns an error if the base URL is invalid.
 func NewClientWithOptions(baseURL string, options ...ClientOption) (*Client, error) {
 	client, err := NewClient(baseURL)
 	if err != nil {
@@ -224,7 +237,9 @@ func (c *Client) do(req *http.Request, v interface{}) (*http.Response, error) {
 	return resp, nil
 }
 
-// GenerateUploadURL generates a pre-signed URL for uploading a file to storage
+// GenerateUploadURL generates a pre-signed URL for uploading a file to storage.
+// The request parameter contains the filename and content type of the file to upload.
+// Returns a response with the upload URL and HTTP method, or an error if generation fails.
 func (c *Client) GenerateUploadURL(ctx context.Context, request *GenerateUploadURLRequest) (*GenerateUploadURLResponse, error) {
 	req, err := c.newRequest(ctx, "POST", "/generate-upload-url", request)
 	if err != nil {
@@ -240,7 +255,9 @@ func (c *Client) GenerateUploadURL(ctx context.Context, request *GenerateUploadU
 	return &resp, nil
 }
 
-// GenerateDownloadURL generates a pre-signed URL for downloading a file from storage
+// GenerateDownloadURL generates a pre-signed URL for downloading a file from storage.
+// The request parameter contains the S3 key of the file to download.
+// Returns a response with the download URL and HTTP method, or an error if generation fails.
 func (c *Client) GenerateDownloadURL(ctx context.Context, request *GenerateDownloadURLRequest) (*GenerateDownloadURLResponse, error) {
 	req, err := c.newRequest(ctx, "POST", "/generate-download-url", request)
 	if err != nil {
@@ -256,7 +273,9 @@ func (c *Client) GenerateDownloadURL(ctx context.Context, request *GenerateDownl
 	return &resp, nil
 }
 
-// GenerateDownloadURLFromKey generates a pre-signed URL for downloading a file from storage using the S3 key directly
+// GenerateDownloadURLFromKey generates a pre-signed URL for downloading a file using just the S3 key.
+// This is a convenience method that wraps GenerateDownloadURL.
+// Returns a response with the download URL and HTTP method, or an error if generation fails.
 func (c *Client) GenerateDownloadURLFromKey(ctx context.Context, s3Key string) (*GenerateDownloadURLResponse, error) {
 	request := &GenerateDownloadURLRequest{
 		S3Key: s3Key,
