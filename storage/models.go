@@ -3,8 +3,6 @@
 // through a simple, idiomatic Go interface.
 package storage
 
-import "fmt"
-
 // GenerateUploadURLRequest defines the request body for generating an upload URL.
 // It specifies the filename and content type of the file to be uploaded.
 type GenerateUploadURLRequest struct {
@@ -33,18 +31,4 @@ type GenerateDownloadURLResponse struct {
 	HTTPMethod  string `json:"httpMethod"` // Expected: "GET"
 }
 
-// ErrorResponse represents a standard error response from the storage API.
-// It contains the error code and an optional description returned by the Atriumn Storage API.
-type ErrorResponse struct {
-	ErrorCode   string `json:"error"`
-	Description string `json:"error_description,omitempty"`
-}
-
-// Error satisfies the error interface by returning a formatted error message.
-// If a description is available, it will be included in the error message.
-func (e *ErrorResponse) Error() string {
-	if e.Description != "" {
-		return fmt.Sprintf("%s: %s", e.ErrorCode, e.Description)
-	}
-	return e.ErrorCode
-}
+// ErrorResponse is now provided by the internal/apierror package.

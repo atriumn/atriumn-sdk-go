@@ -15,6 +15,8 @@ import (
 	"path"
 	"strconv"
 	"time"
+
+	"github.com/atriumn/atriumn-sdk-go/internal/apierror"
 )
 
 const (
@@ -274,12 +276,12 @@ func (c *Client) do(req *http.Request, v interface{}) (*http.Response, error) {
 	resp.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		var errResp ErrorResponse
+		var errResp apierror.ErrorResponse
 
 		// Try to unmarshal the error response
 		if err := json.Unmarshal(bodyBytes, &errResp); err != nil {
 			// If we can't parse the error response, create a generic one
-			return resp, &ErrorResponse{
+			return resp, &apierror.ErrorResponse{
 				ErrorCode:   "unknown_error",
 				Description: fmt.Sprintf("HTTP error %d: %s", resp.StatusCode, string(bodyBytes)),
 			}

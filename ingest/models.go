@@ -3,8 +3,6 @@
 // through a simple, idiomatic Go interface.
 package ingest
 
-import "fmt"
-
 // IngestTextRequest represents a request to ingest text content.
 // It contains the text content to be ingested along with optional
 // tenant ID, user ID, and metadata.
@@ -74,18 +72,4 @@ type ListContentResponse struct {
 	NextToken string        `json:"nextToken,omitempty"`
 }
 
-// ErrorResponse represents an error response from the API.
-// It contains the error code and an optional description returned by the Atriumn Ingest API.
-type ErrorResponse struct {
-	ErrorCode   string `json:"error"`
-	Description string `json:"error_description,omitempty"`
-}
-
-// Error satisfies the error interface by returning a formatted error message.
-// If a description is available, it will be included in the error message.
-func (e *ErrorResponse) Error() string {
-	if e.Description != "" {
-		return fmt.Sprintf("%s: %s", e.ErrorCode, e.Description)
-	}
-	return e.ErrorCode
-} 
+// ErrorResponse is now provided by the internal/apierror package. 

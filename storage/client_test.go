@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/atriumn/atriumn-sdk-go/internal/apierror"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -208,7 +209,7 @@ func TestGenerateUploadURL_Error(t *testing.T) {
 	assert.Nil(t, resp)
 
 	// Check that error is properly parsed
-	errorResp, ok := err.(*ErrorResponse)
+	errorResp, ok := err.(*apierror.ErrorResponse)
 	assert.True(t, ok)
 	assert.Equal(t, "invalid_request", errorResp.ErrorCode)
 	assert.Equal(t, "The filename is required", errorResp.Description)
@@ -328,7 +329,7 @@ func TestGenerateDownloadURL_Error(t *testing.T) {
 	assert.Nil(t, resp)
 
 	// Check that error is properly parsed
-	errorResp, ok := err.(*ErrorResponse)
+	errorResp, ok := err.(*apierror.ErrorResponse)
 	assert.True(t, ok)
 	assert.Equal(t, "not_found", errorResp.ErrorCode)
 	assert.Equal(t, "The specified key does not exist", errorResp.Description)
@@ -386,7 +387,7 @@ func TestErrorResponse(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := &ErrorResponse{
+			err := &apierror.ErrorResponse{
 				ErrorCode:   tt.errorCode,
 				Description: tt.description,
 			}
@@ -415,7 +416,7 @@ func TestNetworkError(t *testing.T) {
 	assert.Nil(t, resp)
 
 	// Check that the error is of type ErrorResponse
-	errorResp, ok := err.(*ErrorResponse)
+	errorResp, ok := err.(*apierror.ErrorResponse)
 	assert.True(t, ok)
 	assert.Equal(t, "request_timeout", errorResp.ErrorCode)
 }
@@ -490,7 +491,7 @@ func TestHTTPStatusCodeErrors(t *testing.T) {
 			})
 
 			require.Error(t, err)
-			errorResp, ok := err.(*ErrorResponse)
+			errorResp, ok := err.(*apierror.ErrorResponse)
 			require.True(t, ok)
 			assert.Equal(t, tt.expectedCode, errorResp.ErrorCode)
 			assert.Equal(t, tt.expectedError, errorResp.Description)
@@ -635,7 +636,7 @@ func TestNetworkTimeoutError(t *testing.T) {
 	})
 
 	require.Error(t, err)
-	errorResp, ok := err.(*ErrorResponse)
+	errorResp, ok := err.(*apierror.ErrorResponse)
 	require.True(t, ok)
 	assert.Equal(t, "request_timeout", errorResp.ErrorCode)
 	assert.Contains(t, errorResp.Description, "The request timed out")

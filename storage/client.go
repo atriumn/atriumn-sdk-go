@@ -12,6 +12,8 @@ import (
 	"net/http"
 	"net/url"
 	"time"
+
+	"github.com/atriumn/atriumn-sdk-go/internal/apierror"
 )
 
 const (
@@ -156,18 +158,18 @@ func (c *Client) do(req *http.Request, v interface{}) (*http.Response, error) {
 		// Handle network-level errors
 		if urlErr, ok := err.(*url.Error); ok {
 			if urlErr.Timeout() {
-				return nil, &ErrorResponse{
+				return nil, &apierror.ErrorResponse{
 					ErrorCode:   "request_timeout",
 					Description: "The request timed out. Please check your network connection and try again.",
 				}
 			} else if urlErr.Temporary() {
-				return nil, &ErrorResponse{
+				return nil, &apierror.ErrorResponse{
 					ErrorCode:   "temporary_error",
 					Description: "A temporary network error occurred. Please try again later.",
 				}
 			}
 		}
-		return nil, &ErrorResponse{
+		return nil, &apierror.ErrorResponse{
 			ErrorCode:   "network_error",
 			Description: fmt.Sprintf("Failed to connect to the storage service: %v", err),
 		}
@@ -180,13 +182,13 @@ func (c *Client) do(req *http.Request, v interface{}) (*http.Response, error) {
 	resp.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		var errResp ErrorResponse
+		var errResp apierror.ErrorResponse
 
 		// We already have the body bytes, no need to read again
 		if len(bodyBytes) > 0 {
 			if jsonErr := json.Unmarshal(bodyBytes, &errResp); jsonErr != nil {
 				// Not valid JSON or unexpected format
-				return nil, &ErrorResponse{
+				return nil, &apierror.ErrorResponse{
 					ErrorCode:   "parse_error",
 					Description: fmt.Sprintf("HTTP error %d with invalid response format", resp.StatusCode),
 				}
@@ -227,7 +229,7 @@ func (c *Client) do(req *http.Request, v interface{}) (*http.Response, error) {
 		// We already have the body bytes, decode from there
 		err = json.Unmarshal(bodyBytes, v)
 		if err != nil {
-			return nil, &ErrorResponse{
+			return nil, &apierror.ErrorResponse{
 				ErrorCode:   "parse_error",
 				Description: fmt.Sprintf("Failed to parse the successful response: %v", err),
 			}

@@ -12,6 +12,8 @@ import (
 	"net/http"
 	"net/url"
 	"time"
+
+	"github.com/atriumn/atriumn-sdk-go/internal/apierror"
 )
 
 const (
@@ -248,7 +250,7 @@ func (c *Client) do(req *http.Request, v interface{}) (*http.Response, error) {
 			return resp, fmt.Errorf("error reading response body: %w", err)
 		}
 
-		var errResp ErrorResponse
+		var errResp apierror.ErrorResponse
 		if err := json.Unmarshal(body, &errResp); err != nil {
 			return resp, fmt.Errorf("error response with status code %d: %s", resp.StatusCode, body)
 		}

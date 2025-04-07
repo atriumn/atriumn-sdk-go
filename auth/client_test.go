@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/atriumn/atriumn-sdk-go/internal/apierror"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -401,9 +402,9 @@ func TestErrorHandling(t *testing.T) {
 	}
 
 	// Check that error is properly cast to ErrorResponse
-	errResp, ok := err.(*ErrorResponse)
+	errResp, ok := err.(*apierror.ErrorResponse)
 	if !ok {
-		t.Fatalf("Expected error to be *ErrorResponse but got %T", err)
+		t.Fatalf("Expected error to be *apierror.ErrorResponse but got %T", err)
 	}
 	if errResp.ErrorCode != "invalid_client" {
 		t.Errorf("errResp.ErrorCode = %v, want %v", errResp.ErrorCode, "invalid_client")
@@ -581,30 +582,30 @@ func TestCreateClientCredential_Error(t *testing.T) {
 		// Return error response
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
-		errorResp := `{
+		response := `{
 			"error": "invalid_request",
-			"error_description": "Scopes array cannot be empty"
+			"error_description": "Missing required fields"
 		}`
-		_, _ = w.Write([]byte(errorResp))
+		_, _ = w.Write([]byte(response))
 	}))
 	defer server.Close()
 
-	// Create request with invalid data
+	// Create request
 	req := ClientCredentialCreateRequest{
-		IssuedTo:    "Test App",
-		Scopes:      []string{}, // Empty scopes will trigger error
-		Description: "Test credential",
+		IssuedTo: "Test App",
+		// Intentionally omit required fields
 	}
 
-	// Call the method
-	_, err := client.CreateClientCredential(context.Background(), req)
+	// Call the method, should get an error
+	resp, err := client.CreateClientCredential(context.Background(), req)
 
-	// Verify error
+	// Verify error response
 	require.Error(t, err)
-	errorResp, ok := err.(*ErrorResponse)
-	require.True(t, ok)
+	require.Nil(t, resp)
+	errorResp, ok := err.(*apierror.ErrorResponse)
+	require.True(t, ok, "Expected error to be *apierror.ErrorResponse")
 	assert.Equal(t, "invalid_request", errorResp.ErrorCode)
-	assert.Equal(t, "Scopes array cannot be empty", errorResp.Description)
+	assert.Equal(t, "Missing required fields", errorResp.Description)
 }
 
 func TestListClientCredentials_Success(t *testing.T) {
@@ -929,29 +930,32 @@ func TestGetClientCredential_Success(t *testing.T) {
 }
 
 func TestGetClientCredential_NotFound(t *testing.T) {
-	credentialID := "nonexistent-id"
-
 	server, client := setupTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Return not found error
+		// Check request
+		assert.Equal(t, "GET", r.Method)
+		assert.Equal(t, "/admin/credentials/not-exist", r.URL.Path)
+
+		// Return error response
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusNotFound)
-		errorResp := `{
+		response := `{
 			"error": "not_found",
-			"error_description": "Client credential not found"
+			"error_description": "Credential not found"
 		}`
-		_, _ = w.Write([]byte(errorResp))
+		_, _ = w.Write([]byte(response))
 	}))
 	defer server.Close()
 
-	// Call the method
-	_, err := client.GetClientCredential(context.Background(), credentialID)
+	// Call the method with a non-existent ID
+	resp, err := client.GetClientCredential(context.Background(), "not-exist")
 
-	// Verify error
+	// Verify error response
 	require.Error(t, err)
-	errorResp, ok := err.(*ErrorResponse)
-	require.True(t, ok)
+	require.Nil(t, resp)
+	errorResp, ok := err.(*apierror.ErrorResponse)
+	require.True(t, ok, "Expected error to be *apierror.ErrorResponse")
 	assert.Equal(t, "not_found", errorResp.ErrorCode)
-	assert.Equal(t, "Client credential not found", errorResp.Description)
+	assert.Equal(t, "Credential not found", errorResp.Description)
 }
 
 func TestUpdateClientCredential_Success(t *testing.T) {
@@ -1108,7 +1112,7 @@ func TestDeleteClientCredential_NotFound(t *testing.T) {
 
 	// Verify error
 	require.Error(t, err)
-	errorResp, ok := err.(*ErrorResponse)
+	errorResp, ok := err.(*apierror.ErrorResponse)
 	require.True(t, ok)
 	assert.Equal(t, "not_found", errorResp.ErrorCode)
 	assert.Equal(t, "Client credential not found", errorResp.Description)
@@ -1147,18 +1151,22 @@ func TestResendConfirmationCode(t *testing.T) {
 
 func TestResendConfirmationCode_Error(t *testing.T) {
 	server, client := setupTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Return error response
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
-		fmt.Fprintln(w, `{
-			"error": "UserNotFoundException",
+		_, _ = fmt.Fprintln(w, `{
+			"error": "user_not_found",
 			"error_description": "User does not exist"
 		}`)
 	}))
 	defer server.Close()
 
-	_, err := client.ResendConfirmationCode(context.Background(), "nonexistent@example.com")
+	details, err := client.ResendConfirmationCode(context.Background(), "nonexistent@example.com")
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "UserNotFoundException")
+	require.Nil(t, details)
+	errorResp, ok := err.(*apierror.ErrorResponse)
+	require.True(t, ok, "Expected error to be *apierror.ErrorResponse")
+	assert.Equal(t, "user_not_found", errorResp.ErrorCode)
 }
 
 func TestConfirmSignup(t *testing.T) {
