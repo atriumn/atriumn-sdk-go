@@ -13,7 +13,7 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/atriumn/atriumn-sdk-go/internal/apierror"
+	"github.com/atriumn/atriumn-sdk-go/internal/clientutil"
 )
 
 const (
@@ -152,91 +152,7 @@ func (c *Client) newRequest(ctx context.Context, method, path string, body inter
 
 // do sends an API request and returns the API response
 func (c *Client) do(req *http.Request, v interface{}) (*http.Response, error) {
-	// Send the request
-	resp, err := c.HTTPClient.Do(req)
-	if err != nil {
-		// Handle network-level errors
-		if urlErr, ok := err.(*url.Error); ok {
-			if urlErr.Timeout() {
-				return nil, &apierror.ErrorResponse{
-					ErrorCode:   "request_timeout",
-					Description: "The request timed out. Please check your network connection and try again.",
-				}
-			} else if urlErr.Temporary() {
-				return nil, &apierror.ErrorResponse{
-					ErrorCode:   "temporary_error",
-					Description: "A temporary network error occurred. Please try again later.",
-				}
-			}
-		}
-		return nil, &apierror.ErrorResponse{
-			ErrorCode:   "network_error",
-			Description: fmt.Sprintf("Failed to connect to the storage service: %v", err),
-		}
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	// Read the response body
-	bodyBytes, _ := io.ReadAll(resp.Body)
-	// Reset the body with a new ReadCloser for further processing
-	resp.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
-
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		var errResp apierror.ErrorResponse
-
-		// We already have the body bytes, no need to read again
-		if len(bodyBytes) > 0 {
-			if jsonErr := json.Unmarshal(bodyBytes, &errResp); jsonErr != nil {
-				// Not valid JSON or unexpected format
-				return nil, &apierror.ErrorResponse{
-					ErrorCode:   "parse_error",
-					Description: fmt.Sprintf("HTTP error %d with invalid response format", resp.StatusCode),
-				}
-			}
-		}
-
-		// If we received an empty error response, create a user-friendly error based on status code
-		if errResp.ErrorCode == "" && errResp.Description == "" {
-			switch resp.StatusCode {
-			case 400:
-				errResp.ErrorCode = "bad_request"
-				errResp.Description = "The request was invalid. Please check your input and try again."
-			case 401:
-				errResp.ErrorCode = "unauthorized"
-				errResp.Description = "Authentication failed. Please check your credentials or login again."
-			case 403:
-				errResp.ErrorCode = "forbidden"
-				errResp.Description = "You don't have permission to access this resource."
-			case 404:
-				errResp.ErrorCode = "not_found"
-				errResp.Description = "The requested resource was not found."
-			case 429:
-				errResp.ErrorCode = "rate_limited"
-				errResp.Description = "Too many requests. Please try again later."
-			case 500, 502, 503, 504:
-				errResp.ErrorCode = "server_error"
-				errResp.Description = "The storage service is currently unavailable. Please try again later."
-			default:
-				errResp.ErrorCode = "unknown_error"
-				errResp.Description = fmt.Sprintf("Unexpected HTTP status: %d", resp.StatusCode)
-			}
-		}
-
-		return nil, &errResp
-	}
-
-	if v != nil {
-		// We already have the body bytes, decode from there
-		err = json.Unmarshal(bodyBytes, v)
-		if err != nil {
-			return nil, &apierror.ErrorResponse{
-				ErrorCode:   "parse_error",
-				Description: fmt.Sprintf("Failed to parse the successful response: %v", err),
-			}
-		}
-	}
-
-	return resp, nil
+	return clientutil.ExecuteRequest(req.Context(), c.HTTPClient, req, v)
 }
 
 // GenerateUploadURL generates a pre-signed URL for uploading a file to storage.

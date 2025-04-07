@@ -13,7 +13,7 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/atriumn/atriumn-sdk-go/internal/apierror"
+	"github.com/atriumn/atriumn-sdk-go/internal/clientutil"
 )
 
 const (
@@ -238,34 +238,7 @@ func (c *Client) newRequest(ctx context.Context, method, path string, body inter
 // The API response is JSON decoded and stored in the value
 // pointed to by v, or returned as an error if an API error has occurred.
 func (c *Client) do(req *http.Request, v interface{}) (*http.Response, error) {
-	resp, err := c.HTTPClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode >= 400 {
-		body, err := io.ReadAll(resp.Body)
-		if err != nil {
-			return resp, fmt.Errorf("error reading response body: %w", err)
-		}
-
-		var errResp apierror.ErrorResponse
-		if err := json.Unmarshal(body, &errResp); err != nil {
-			return resp, fmt.Errorf("error response with status code %d: %s", resp.StatusCode, body)
-		}
-
-		return resp, &errResp
-	}
-
-	if v != nil {
-		// If we got a response and the caller expects a value, decode it
-		if err := json.NewDecoder(resp.Body).Decode(v); err != nil {
-			return resp, err
-		}
-	}
-
-	return resp, nil
+	return clientutil.ExecuteRequest(req.Context(), c.HTTPClient, req, v)
 }
 
 // Health checks the health status of the Auth API.

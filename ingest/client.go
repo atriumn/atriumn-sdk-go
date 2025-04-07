@@ -16,7 +16,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/atriumn/atriumn-sdk-go/internal/apierror"
+	"github.com/atriumn/atriumn-sdk-go/internal/clientutil"
 )
 
 const (
@@ -260,70 +260,7 @@ func (c *Client) newRequest(ctx context.Context, method, path string, body inter
 
 // do sends an API request and returns the API response
 func (c *Client) do(req *http.Request, v interface{}) (*http.Response, error) {
-	resp, err := c.HTTPClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to send request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	// Read the entire response body
-	bodyBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return resp, fmt.Errorf("failed to read response body: %w", err)
-	}
-
-	// Create a new reader for future parsing
-	resp.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
-
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		var errResp apierror.ErrorResponse
-
-		// Try to unmarshal the error response
-		if err := json.Unmarshal(bodyBytes, &errResp); err != nil {
-			// If we can't parse the error response, create a generic one
-			return resp, &apierror.ErrorResponse{
-				ErrorCode:   "unknown_error",
-				Description: fmt.Sprintf("HTTP error %d: %s", resp.StatusCode, string(bodyBytes)),
-			}
-		}
-
-		// If we got an empty error response, create a formatted error based on status code
-		if errResp.ErrorCode == "" {
-			switch resp.StatusCode {
-			case http.StatusBadRequest:
-				errResp.ErrorCode = "bad_request"
-				errResp.Description = "The request was invalid. Please check your input and try again."
-			case http.StatusUnauthorized:
-				errResp.ErrorCode = "unauthorized"
-				errResp.Description = "Authentication required. Please provide valid credentials."
-			case http.StatusForbidden:
-				errResp.ErrorCode = "forbidden"
-				errResp.Description = "You don't have permission to access this resource."
-			case http.StatusNotFound:
-				errResp.ErrorCode = "not_found"
-				errResp.Description = "The requested resource was not found."
-			case http.StatusTooManyRequests:
-				errResp.ErrorCode = "rate_limited"
-				errResp.Description = "Too many requests. Please try again later."
-			case http.StatusInternalServerError:
-				errResp.ErrorCode = "server_error"
-				errResp.Description = "An internal server error occurred. Please try again later."
-			default:
-				errResp.ErrorCode = "unknown_error"
-				errResp.Description = fmt.Sprintf("Unexpected status code: %d", resp.StatusCode)
-			}
-		}
-
-		return resp, &errResp
-	}
-
-	if v != nil && len(bodyBytes) > 0 {
-		if err := json.Unmarshal(bodyBytes, v); err != nil {
-			return resp, fmt.Errorf("failed to unmarshal response: %w", err)
-		}
-	}
-
-	return resp, nil
+	return clientutil.ExecuteRequest(req.Context(), c.HTTPClient, req, v)
 }
 
 // GetContentItem retrieves a content item by its ID.
