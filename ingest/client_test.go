@@ -3,11 +3,15 @@ package ingest
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
+	"time"
 )
 
 // MockTokenProvider provides a mock implementation of the TokenProvider interface
@@ -30,6 +34,50 @@ func setupTestServer(t *testing.T, statusCode int, responseBody string, validate
 		w.WriteHeader(statusCode)
 		w.Write([]byte(responseBody))
 	}))
+}
+
+// Custom client transport that causes network errors
+type errorTransport struct {
+	err error
+}
+
+func (t *errorTransport) RoundTrip(*http.Request) (*http.Response, error) {
+	return nil, t.err
+}
+
+// ErrReader implements io.Reader and always returns an error on Read
+type ErrReader struct {
+	err error
+}
+
+func (r *ErrReader) Read(p []byte) (n int, err error) {
+	return 0, r.err
+}
+
+// BodyReadErrorTransport returns a valid response but with a body that will fail on read
+type BodyReadErrorTransport struct {
+}
+
+func (t *BodyReadErrorTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	// Create a broken reader that will fail when read
+	return &http.Response{
+		StatusCode: http.StatusOK,
+		Body:       io.NopCloser(&ErrReader{err: fmt.Errorf("simulated body read error")}),
+		Header:     make(http.Header),
+	}, nil
+}
+
+// InvalidJSONTransport returns a response with invalid JSON content
+type InvalidJSONTransport struct {
+}
+
+func (t *InvalidJSONTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	// Return valid status but invalid JSON
+	return &http.Response{
+		StatusCode: http.StatusOK,
+		Body:       io.NopCloser(strings.NewReader(`{"this is not valid json`)),
+		Header:     make(http.Header),
+	}, nil
 }
 
 func TestNewClient(t *testing.T) {
@@ -274,6 +322,131 @@ func TestClient_IngestFile(t *testing.T) {
 	}
 	if resp.Status != "pending" {
 		t.Errorf("IngestFile response Status = %q, want %q", resp.Status, "pending")
+	}
+}
+
+func TestClient_IngestFile_ReaderErrors(t *testing.T) {
+	server := setupTestServer(t, http.StatusOK, `{"id":"test-id","status":"pending","tenantId":"tenant-123","timestamp":"2023-04-01T12:34:56Z"}`, nil)
+	defer server.Close()
+
+	client, _ := NewClient(server.URL)
+
+	// Test with a reader that returns an error
+	readerErr := fmt.Errorf("simulated read error")
+	_, err := client.IngestFile(
+		context.Background(),
+		"tenant-123",
+		"test.txt",
+		"text/plain",
+		"user-456",
+		&ErrReader{err: readerErr},
+	)
+
+	if err == nil {
+		t.Fatal("Expected error but got nil")
+	}
+
+	if !strings.Contains(err.Error(), "failed to copy file content") {
+		t.Errorf("Expected error containing 'failed to copy file content', got %q", err.Error())
+	}
+	if !strings.Contains(err.Error(), readerErr.Error()) {
+		t.Errorf("Expected error containing %q, got %q", readerErr.Error(), err.Error())
+	}
+}
+
+func TestClient_IngestFile_APIErrors(t *testing.T) {
+	testCases := []struct {
+		name           string
+		statusCode     int
+		responseBody   string
+		expectedErrMsg string
+	}{
+		{
+			name:           "Bad Request",
+			statusCode:     http.StatusBadRequest,
+			responseBody:   `{"error":"validation_error","error_description":"Invalid file format"}`,
+			expectedErrMsg: "validation_error: Invalid file format",
+		},
+		{
+			name:           "Payload Too Large",
+			statusCode:     http.StatusRequestEntityTooLarge,
+			responseBody:   `{"error":"file_too_large","error_description":"File exceeds maximum size of 10MB"}`,
+			expectedErrMsg: "file_too_large: File exceeds maximum size of 10MB",
+		},
+		{
+			name:           "Internal Server Error",
+			statusCode:     http.StatusInternalServerError,
+			responseBody:   `{"error":"internal_error","error_description":"Failed to process file"}`,
+			expectedErrMsg: "internal_error: Failed to process file",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			server := setupTestServer(t, tc.statusCode, tc.responseBody, nil)
+			defer server.Close()
+
+			client, _ := NewClient(server.URL)
+
+			_, err := client.IngestFile(
+				context.Background(),
+				"tenant-123",
+				"test.txt",
+				"text/plain",
+				"user-456",
+				strings.NewReader("test file content"),
+			)
+
+			if err == nil {
+				t.Fatal("Expected error but got nil")
+			}
+
+			if !strings.Contains(err.Error(), tc.expectedErrMsg) {
+				t.Errorf("Expected error containing %q, got %q", tc.expectedErrMsg, err.Error())
+			}
+		})
+	}
+}
+
+func TestClient_IngestFile_WithEmptyFields(t *testing.T) {
+	expectedResponse := `{"id":"test-id","status":"pending","tenantId":"default-tenant","timestamp":"2023-04-01T12:34:56Z"}`
+	
+	server := setupTestServer(t, http.StatusOK, expectedResponse, func(r *http.Request) {
+		err := r.ParseMultipartForm(10 << 20) // 10 MB max
+		if err != nil {
+			t.Fatalf("Failed to parse multipart form: %v", err)
+		}
+		
+		// Tenant ID should not be in form if empty
+		if tenantID := r.FormValue("tenantId"); tenantID != "" {
+			t.Errorf("Expected empty tenantId in form, got %s", tenantID)
+		}
+		
+		// User ID should not be in form if empty
+		if userID := r.FormValue("userId"); userID != "" {
+			t.Errorf("Expected empty userId in form, got %s", userID)
+		}
+	})
+	defer server.Close()
+	
+	client, _ := NewClient(server.URL)
+	
+	// Test with empty tenant ID and user ID
+	resp, err := client.IngestFile(
+		context.Background(),
+		"", // empty tenant ID
+		"test.txt",
+		"text/plain",
+		"", // empty user ID
+		strings.NewReader("test file content"),
+	)
+	
+	if err != nil {
+		t.Fatalf("IngestFile returned unexpected error: %v", err)
+	}
+	
+	if resp.ID != "test-id" {
+		t.Errorf("IngestFile response ID = %q, want %q", resp.ID, "test-id")
 	}
 }
 
@@ -547,5 +720,450 @@ func TestClient_ListContentItems_NoFilters(t *testing.T) {
 	
 	if resp.NextToken != "" {
 		t.Errorf("NextToken = %q, want empty string", resp.NextToken)
+	}
+}
+
+func TestErrorResponse_Error(t *testing.T) {
+	// Test with description
+	errWithDesc := &ErrorResponse{
+		ErrorCode:   "invalid_request",
+		Description: "Missing required field",
+	}
+	expected := "invalid_request: Missing required field"
+	if errWithDesc.Error() != expected {
+		t.Errorf("Error() = %q, want %q", errWithDesc.Error(), expected)
+	}
+
+	// Test without description
+	errNoDesc := &ErrorResponse{
+		ErrorCode: "rate_limited",
+	}
+	if errNoDesc.Error() != "rate_limited" {
+		t.Errorf("Error() = %q, want %q", errNoDesc.Error(), "rate_limited")
+	}
+}
+
+func TestClient_DoWithStatusCodes(t *testing.T) {
+	testCases := []struct {
+		name          string
+		statusCode    int
+		responseBody  string
+		expectedError *ErrorResponse
+	}{
+		{
+			name:         "BadRequest",
+			statusCode:   http.StatusBadRequest,
+			responseBody: `{"error":"validation_error","error_description":"Field 'content' is required"}`,
+			expectedError: &ErrorResponse{
+				ErrorCode:   "validation_error",
+				Description: "Field 'content' is required",
+			},
+		},
+		{
+			name:         "Unauthorized",
+			statusCode:   http.StatusUnauthorized,
+			responseBody: `{"error":"invalid_token","error_description":"Token has expired"}`,
+			expectedError: &ErrorResponse{
+				ErrorCode:   "invalid_token",
+				Description: "Token has expired",
+			},
+		},
+		{
+			name:         "Forbidden",
+			statusCode:   http.StatusForbidden,
+			responseBody: `{"error":"access_denied","error_description":"Insufficient permissions"}`,
+			expectedError: &ErrorResponse{
+				ErrorCode:   "access_denied",
+				Description: "Insufficient permissions",
+			},
+		},
+		{
+			name:         "NotFound",
+			statusCode:   http.StatusNotFound,
+			responseBody: `{"error":"resource_not_found","error_description":"The requested resource does not exist"}`,
+			expectedError: &ErrorResponse{
+				ErrorCode:   "resource_not_found",
+				Description: "The requested resource does not exist",
+			},
+		},
+		{
+			name:         "TooManyRequests",
+			statusCode:   http.StatusTooManyRequests,
+			responseBody: `{"error":"rate_limit_exceeded","error_description":"Too many requests, please try again later"}`,
+			expectedError: &ErrorResponse{
+				ErrorCode:   "rate_limit_exceeded",
+				Description: "Too many requests, please try again later",
+			},
+		},
+		{
+			name:         "InternalServerError",
+			statusCode:   http.StatusInternalServerError,
+			responseBody: `{"error":"internal_error","error_description":"An unexpected error occurred"}`,
+			expectedError: &ErrorResponse{
+				ErrorCode:   "internal_error",
+				Description: "An unexpected error occurred",
+			},
+		},
+		{
+			name:         "ServiceUnavailable",
+			statusCode:   http.StatusServiceUnavailable,
+			responseBody: `{"error":"service_unavailable","error_description":"Service is currently unavailable"}`,
+			expectedError: &ErrorResponse{
+				ErrorCode:   "service_unavailable",
+				Description: "Service is currently unavailable",
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			server := setupTestServer(t, tc.statusCode, tc.responseBody, nil)
+			defer server.Close()
+
+			client, _ := NewClient(server.URL)
+
+			_, err := client.IngestText(context.Background(), &IngestTextRequest{
+				Content: "test content",
+			})
+
+			if err == nil {
+				t.Fatal("Expected error but got nil")
+			}
+
+			apiErr, ok := err.(*ErrorResponse)
+			if !ok {
+				t.Fatalf("Expected *ErrorResponse, got %T", err)
+			}
+
+			if apiErr.ErrorCode != tc.expectedError.ErrorCode {
+				t.Errorf("ErrorCode = %q, want %q", apiErr.ErrorCode, tc.expectedError.ErrorCode)
+			}
+			if apiErr.Description != tc.expectedError.Description {
+				t.Errorf("Description = %q, want %q", apiErr.Description, tc.expectedError.Description)
+			}
+		})
+	}
+}
+
+func TestClient_DoWithInvalidErrorResponses(t *testing.T) {
+	testCases := []struct {
+		name              string
+		statusCode        int
+		responseBody      string
+		expectedErrorCode string
+	}{
+		{
+			name:              "BadRequest with invalid JSON",
+			statusCode:        http.StatusBadRequest,
+			responseBody:      `<html>Bad Request</html>`,
+			expectedErrorCode: "unknown_error",
+		},
+		{
+			name:              "Unauthorized with invalid JSON",
+			statusCode:        http.StatusUnauthorized,
+			responseBody:      `<html>Unauthorized</html>`,
+			expectedErrorCode: "unknown_error",
+		},
+		{
+			name:              "Forbidden with invalid JSON",
+			statusCode:        http.StatusForbidden,
+			responseBody:      `<html>Forbidden</html>`,
+			expectedErrorCode: "unknown_error",
+		},
+		{
+			name:              "NotFound with invalid JSON",
+			statusCode:        http.StatusNotFound,
+			responseBody:      `<html>Not Found</html>`,
+			expectedErrorCode: "unknown_error",
+		},
+		{
+			name:              "TooManyRequests with invalid JSON",
+			statusCode:        http.StatusTooManyRequests,
+			responseBody:      `<html>Too Many Requests</html>`,
+			expectedErrorCode: "unknown_error",
+		},
+		{
+			name:              "InternalServerError with invalid JSON",
+			statusCode:        http.StatusInternalServerError,
+			responseBody:      `<html>Internal Server Error</html>`,
+			expectedErrorCode: "unknown_error",
+		},
+		{
+			name:              "Unknown status code with invalid JSON",
+			statusCode:        http.StatusTeapot,
+			responseBody:      `<html>I'm a teapot</html>`,
+			expectedErrorCode: "unknown_error",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			server := setupTestServer(t, tc.statusCode, tc.responseBody, nil)
+			defer server.Close()
+
+			client, _ := NewClient(server.URL)
+
+			_, err := client.IngestText(context.Background(), &IngestTextRequest{
+				Content: "test content",
+			})
+
+			if err == nil {
+				t.Fatal("Expected error but got nil")
+			}
+
+			apiErr, ok := err.(*ErrorResponse)
+			if !ok {
+				t.Fatalf("Expected *ErrorResponse, got %T", err)
+			}
+
+			if apiErr.ErrorCode != tc.expectedErrorCode {
+				t.Errorf("ErrorCode = %q, want %q", apiErr.ErrorCode, tc.expectedErrorCode)
+			}
+
+			// Also verify that the description contains the status code
+			if !strings.Contains(apiErr.Description, fmt.Sprintf("HTTP error %d", tc.statusCode)) {
+				t.Errorf("Expected description to contain status code %d, got: %s", tc.statusCode, apiErr.Description)
+			}
+		})
+	}
+}
+
+func TestClient_DoWithNetworkErrors(t *testing.T) {
+	testCases := []struct {
+		name        string
+		transportFn func() http.RoundTripper
+		expectedErr string
+	}{
+		{
+			name: "Connection refused",
+			transportFn: func() http.RoundTripper {
+				return &errorTransport{err: &url.Error{
+					Op:  "Post",
+					URL: "https://example.com",
+					Err: &net.OpError{
+						Op:     "dial",
+						Net:    "tcp",
+						Source: nil,
+						Addr:   nil,
+						Err:    fmt.Errorf("connection refused"),
+					},
+				}}
+			},
+			expectedErr: "failed to send request",
+		},
+		{
+			name: "DNS lookup error",
+			transportFn: func() http.RoundTripper {
+				return &errorTransport{err: &url.Error{
+					Op:  "Post",
+					URL: "https://example.com",
+					Err: &net.DNSError{
+						Err:        "no such host",
+						Name:       "example.com",
+						IsNotFound: true,
+					},
+				}}
+			},
+			expectedErr: "failed to send request",
+		},
+		{
+			name: "Timeout error",
+			transportFn: func() http.RoundTripper {
+				return &errorTransport{err: &url.Error{
+					Op:  "Post",
+					URL: "https://example.com",
+					Err: context.DeadlineExceeded,
+				}}
+			},
+			expectedErr: "failed to send request",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+			}))
+			defer server.Close()
+
+			client, _ := NewClientWithOptions(
+				server.URL,
+				WithHTTPClient(&http.Client{
+					Transport: tc.transportFn(),
+				}),
+			)
+
+			_, err := client.IngestText(context.Background(), &IngestTextRequest{
+				Content: "test content",
+			})
+
+			if err == nil {
+				t.Fatal("Expected error but got nil")
+			}
+
+			if !strings.Contains(err.Error(), tc.expectedErr) {
+				t.Errorf("Expected error containing %q, got %q", tc.expectedErr, err.Error())
+			}
+		})
+	}
+}
+
+func TestClient_ContextCancellation(t *testing.T) {
+	// Create a server that sleeps to simulate a slow response
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(500 * time.Millisecond)
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"id":"test-id","status":"pending","tenantId":"tenant-123","timestamp":"2023-04-01T12:34:56Z"}`))
+	}))
+	defer server.Close()
+
+	client, _ := NewClient(server.URL)
+
+	// Create a context that will be canceled immediately
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // Cancel immediately
+
+	_, err := client.IngestText(ctx, &IngestTextRequest{
+		Content: "test content",
+	})
+
+	if err == nil {
+		t.Fatal("Expected error but got nil")
+	}
+
+	if !strings.Contains(err.Error(), "context canceled") {
+		t.Errorf("Expected error containing 'context canceled', got %q", err.Error())
+	}
+}
+
+func TestClient_DoResponseBodyReadError(t *testing.T) {
+	client, _ := NewClientWithOptions(
+		"https://example.com",
+		WithHTTPClient(&http.Client{
+			Transport: &BodyReadErrorTransport{},
+		}),
+	)
+
+	_, err := client.IngestText(context.Background(), &IngestTextRequest{
+		Content: "test content",
+	})
+
+	if err == nil {
+		t.Fatal("Expected error but got nil")
+	}
+
+	if !strings.Contains(err.Error(), "failed to read response body") {
+		t.Errorf("Expected error containing 'failed to read response body', got %q", err.Error())
+	}
+}
+
+func TestClient_DoJSONUnmarshalError(t *testing.T) {
+	client, _ := NewClientWithOptions(
+		"https://example.com",
+		WithHTTPClient(&http.Client{
+			Transport: &InvalidJSONTransport{},
+		}),
+	)
+
+	_, err := client.IngestText(context.Background(), &IngestTextRequest{
+		Content: "test content",
+	})
+
+	if err == nil {
+		t.Fatal("Expected error but got nil")
+	}
+
+	if !strings.Contains(err.Error(), "failed to unmarshal response") {
+		t.Errorf("Expected error containing 'failed to unmarshal response', got %q", err.Error())
+	}
+}
+
+func TestClient_DoWithEmptyErrorCodes(t *testing.T) {
+	testCases := []struct {
+		name              string
+		statusCode        int
+		responseBody      string
+		expectedErrorCode string
+		expectedDescContains string
+	}{
+		{
+			name:              "BadRequest with empty error code",
+			statusCode:        http.StatusBadRequest,
+			responseBody:      `{}`,
+			expectedErrorCode: "bad_request",
+			expectedDescContains: "The request was invalid",
+		},
+		{
+			name:              "Unauthorized with empty error code",
+			statusCode:        http.StatusUnauthorized,
+			responseBody:      `{}`,
+			expectedErrorCode: "unauthorized",
+			expectedDescContains: "Authentication required",
+		},
+		{
+			name:              "Forbidden with empty error code",
+			statusCode:        http.StatusForbidden,
+			responseBody:      `{}`,
+			expectedErrorCode: "forbidden",
+			expectedDescContains: "You don't have permission",
+		},
+		{
+			name:              "NotFound with empty error code",
+			statusCode:        http.StatusNotFound,
+			responseBody:      `{}`,
+			expectedErrorCode: "not_found",
+			expectedDescContains: "The requested resource was not found",
+		},
+		{
+			name:              "TooManyRequests with empty error code",
+			statusCode:        http.StatusTooManyRequests,
+			responseBody:      `{}`,
+			expectedErrorCode: "rate_limited",
+			expectedDescContains: "Too many requests",
+		},
+		{
+			name:              "InternalServerError with empty error code",
+			statusCode:        http.StatusInternalServerError,
+			responseBody:      `{}`,
+			expectedErrorCode: "server_error",
+			expectedDescContains: "An internal server error occurred",
+		},
+		{
+			name:              "Unknown status code with empty error code",
+			statusCode:        http.StatusTeapot,
+			responseBody:      `{}`,
+			expectedErrorCode: "unknown_error",
+			expectedDescContains: "Unexpected status code: 418",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			server := setupTestServer(t, tc.statusCode, tc.responseBody, nil)
+			defer server.Close()
+
+			client, _ := NewClient(server.URL)
+
+			_, err := client.IngestText(context.Background(), &IngestTextRequest{
+				Content: "test content",
+			})
+
+			if err == nil {
+				t.Fatal("Expected error but got nil")
+			}
+
+			apiErr, ok := err.(*ErrorResponse)
+			if !ok {
+				t.Fatalf("Expected *ErrorResponse, got %T", err)
+			}
+
+			if apiErr.ErrorCode != tc.expectedErrorCode {
+				t.Errorf("ErrorCode = %q, want %q", apiErr.ErrorCode, tc.expectedErrorCode)
+			}
+
+			if !strings.Contains(apiErr.Description, tc.expectedDescContains) {
+				t.Errorf("Expected description to contain %q, got: %s", tc.expectedDescContains, apiErr.Description)
+			}
+		})
 	}
 } 
