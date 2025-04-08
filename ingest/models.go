@@ -34,6 +34,27 @@ type IngestFileRequest struct {
 	Metadata map[string]string
 }
 
+// RequestFileUploadRequest represents a request to initiate a file upload session.
+// It sends metadata to the ingest service to obtain an upload URL.
+type RequestFileUploadRequest struct {
+	Filename    string            `json:"filename"`              // The name of the file to be uploaded.
+	ContentType string            `json:"contentType"`           // The MIME type of the file.
+	TenantID    string            `json:"tenantId,omitempty"`    // Optional Tenant ID.
+	UserID      string            `json:"userId,omitempty"`      // Optional User ID.
+	Metadata    map[string]string `json:"metadata,omitempty"`    // Optional metadata map.
+}
+
+// RequestFileUploadResponse defines the successful response body after requesting a file upload.
+// It contains the pre-signed URL for uploading the file and the unique content item ID.
+type RequestFileUploadResponse struct {
+	ContentID  string `json:"id"`                  // The unique ID assigned to the content item.
+	Status     string `json:"status"`              // The status of the content item (should be UPLOADING).
+	UploadURL  string `json:"uploadUrl"`           // The pre-signed URL to use for the HTTP PUT upload.
+	TenantID   string `json:"tenantId,omitempty"`  // The tenant ID associated with this upload.
+	UserID     string `json:"userId,omitempty"`    // The user ID associated with this upload, if provided.
+	Timestamp  string `json:"timestamp,omitempty"` // The timestamp when the request was processed.
+}
+
 // IngestResponse represents the response from the ingest endpoints.
 // It contains details about the ingested content, including its unique ID,
 // processing status, and associated metadata.

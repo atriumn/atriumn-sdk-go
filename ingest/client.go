@@ -149,6 +149,11 @@ func (c *Client) IngestURL(ctx context.Context, request *IngestURLRequest) (*Ing
 // Parameters include tenant ID, filename, content type, user ID, and a reader
 // providing the file content to be uploaded.
 // Returns an ingest response with details about the ingested file or an error.
+//
+// Deprecated: This method uses the old single-step multipart/form-data upload pattern
+// which is no longer supported by the refactored ingest service endpoint (/ingest/file).
+// Use RequestFileUpload to get a pre-signed URL, then perform an HTTP PUT request
+// directly to that URL with the file content.
 func (c *Client) IngestFile(ctx context.Context, tenantID string, filename string, contentType string, userID string, fileReader io.Reader) (*IngestResponse, error) {
 	// Create multipart writer
 	body := &bytes.Buffer{}
@@ -215,6 +220,61 @@ func (c *Client) IngestFile(ctx context.Context, tenantID string, filename strin
 	}
 
 	return &resp, nil
+}
+
+// RequestFileUpload initiates a file upload by sending metadata to the ingest service.
+// It returns the pre-signed URL required for the client to upload the file directly to S3.
+func (c *Client) RequestFileUpload(ctx context.Context, request *RequestFileUploadRequest) (*RequestFileUploadResponse, error) {
+	// Use the internal newRequest helper to create the POST request
+	// The path should now be `/ingest/file` based on service refactor. Double-check service route.
+	httpReq, err := c.newRequest(ctx, "POST", "/ingest/file", request) // Pass the RequestFileUploadRequest struct directly
+	if err != nil {
+		return nil, fmt.Errorf("failed to create file upload request: %w", err)
+	}
+
+	// Execute the request using the internal 'do' helper, expecting RequestFileUploadResponse
+	var resp RequestFileUploadResponse
+	_, err = c.do(httpReq, &resp) // Pass pointer to the response struct
+	if err != nil {
+		return nil, err // Error handling (including 4xx/5xx) is done within c.do
+	}
+
+	// Return the successful response
+	return &resp, nil
+}
+
+// UploadToURL uploads file content directly to a pre-signed URL.
+// This is a utility method that can be used after RequestFileUpload to complete the two-step upload process.
+// It handles making the PUT request with the correct headers and returns the HTTP response.
+func (c *Client) UploadToURL(ctx context.Context, uploadURL string, contentType string, fileReader io.Reader) (*http.Response, error) {
+	req, err := http.NewRequestWithContext(ctx, "PUT", uploadURL, fileReader)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create upload request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", contentType)
+
+	// Don't follow redirects for pre-signed URLs
+	client := &http.Client{
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
+	
+	// Execute request directly without using the c.do method since we want the raw response
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to upload to pre-signed URL: %w", err)
+	}
+
+	// Check for successful upload
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		respBody, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		return nil, fmt.Errorf("upload failed with status %d: %s", resp.StatusCode, string(respBody))
+	}
+
+	return resp, nil
 }
 
 // newRequest creates an API request with the specified method, path, and body

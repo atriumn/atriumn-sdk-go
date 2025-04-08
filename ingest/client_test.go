@@ -1456,4 +1456,324 @@ func TestIngestFileURLConstruction(t *testing.T) {
 			// would have returned an error if the URL wasn't valid
 		})
 	}
+}
+
+func TestClient_RequestFileUpload(t *testing.T) {
+	expectedResponse := `{"id":"test-id","status":"pending","tenantId":"tenant-123","userId":"user-456","uploadUrl":"https://example-bucket.s3.amazonaws.com/files/test-id?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=...","timestamp":"2023-04-01T12:34:56Z"}`
+	
+	server := setupTestServer(t, http.StatusOK, expectedResponse, func(r *http.Request) {
+		// Validate request
+		if r.Method != "POST" {
+			t.Errorf("Expected POST request, got %s", r.Method)
+		}
+		if r.URL.Path != "/ingest/file" {
+			t.Errorf("Expected path /ingest/file, got %s", r.URL.Path)
+		}
+		
+		// Check content type is application/json
+		contentType := r.Header.Get("Content-Type")
+		if contentType != "application/json" {
+			t.Errorf("Expected Content-Type application/json, got %s", contentType)
+		}
+		
+		// Parse request body
+		var req RequestFileUploadRequest
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Fatalf("Failed to read request body: %v", err)
+		}
+		
+		err = json.Unmarshal(body, &req)
+		if err != nil {
+			t.Fatalf("Failed to unmarshal request body: %v", err)
+		}
+		
+		// Check request fields
+		if req.Filename != "test.txt" {
+			t.Errorf("Expected Filename: test.txt, got %s", req.Filename)
+		}
+		if req.ContentType != "text/plain" {
+			t.Errorf("Expected ContentType: text/plain, got %s", req.ContentType)
+		}
+		if req.TenantID != "tenant-123" {
+			t.Errorf("Expected TenantID: tenant-123, got %s", req.TenantID)
+		}
+		if req.UserID != "user-456" {
+			t.Errorf("Expected UserID: user-456, got %s", req.UserID)
+		}
+	})
+	defer server.Close()
+	
+	client, err := NewClient(server.URL)
+	if err != nil {
+		t.Fatalf("Failed to create client: %v", err)
+	}
+	
+	request := &RequestFileUploadRequest{
+		Filename:    "test.txt",
+		ContentType: "text/plain",
+		TenantID:    "tenant-123",
+		UserID:      "user-456",
+		Metadata:    map[string]string{"key": "value"},
+	}
+	
+	resp, err := client.RequestFileUpload(context.Background(), request)
+	if err != nil {
+		t.Fatalf("RequestFileUpload returned unexpected error: %v", err)
+	}
+	
+	if resp.ContentID != "test-id" {
+		t.Errorf("RequestFileUpload response ContentID = %q, want %q", resp.ContentID, "test-id")
+	}
+	if resp.Status != "pending" {
+		t.Errorf("RequestFileUpload response Status = %q, want %q", resp.Status, "pending")
+	}
+	if resp.UploadURL != "https://example-bucket.s3.amazonaws.com/files/test-id?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=..." {
+		t.Errorf("RequestFileUpload response UploadURL = %q, want a pre-signed S3 URL", resp.UploadURL)
+	}
+}
+
+func TestClient_RequestFileUpload_WithEmptyFields(t *testing.T) {
+	expectedResponse := `{"id":"test-id","status":"pending","tenantId":"default-tenant","uploadUrl":"https://example-bucket.s3.amazonaws.com/files/test-id?signed=true","timestamp":"2023-04-01T12:34:56Z"}`
+	
+	server := setupTestServer(t, http.StatusOK, expectedResponse, func(r *http.Request) {
+		// Parse request body
+		var req RequestFileUploadRequest
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Fatalf("Failed to read request body: %v", err)
+		}
+		
+		err = json.Unmarshal(body, &req)
+		if err != nil {
+			t.Fatalf("Failed to unmarshal request body: %v", err)
+		}
+		
+		// Check that optional fields are not present in the JSON if empty
+		var jsonMap map[string]interface{}
+		if err := json.Unmarshal(body, &jsonMap); err != nil {
+			t.Fatalf("Failed to unmarshal body to map: %v", err)
+		}
+		
+		if _, exists := jsonMap["tenantId"]; exists {
+			t.Error("TenantID field should not be present in JSON if empty")
+		}
+		
+		if _, exists := jsonMap["userId"]; exists {
+			t.Error("UserID field should not be present in JSON if empty")
+		}
+		
+		if _, exists := jsonMap["metadata"]; exists {
+			t.Error("Metadata field should not be present in JSON if empty")
+		}
+	})
+	defer server.Close()
+	
+	client, _ := NewClient(server.URL)
+	
+	// Test with empty optional fields
+	request := &RequestFileUploadRequest{
+		Filename:    "test.txt",
+		ContentType: "text/plain",
+		// TenantID, UserID, and Metadata are omitted
+	}
+	
+	resp, err := client.RequestFileUpload(context.Background(), request)
+	if err != nil {
+		t.Fatalf("RequestFileUpload returned unexpected error: %v", err)
+	}
+	
+	if resp.ContentID != "test-id" {
+		t.Errorf("RequestFileUpload response ContentID = %q, want %q", resp.ContentID, "test-id")
+	}
+}
+
+func TestClient_RequestFileUpload_APIErrors(t *testing.T) {
+	testCases := []struct {
+		name           string
+		statusCode     int
+		responseBody   string
+		expectedErrMsg string
+	}{
+		{
+			name:           "Bad Request",
+			statusCode:     http.StatusBadRequest,
+			responseBody:   `{"error":"validation_error","error_description":"Missing required fields"}`,
+			expectedErrMsg: "validation_error: Missing required fields",
+		},
+		{
+			name:           "Unauthorized",
+			statusCode:     http.StatusUnauthorized,
+			responseBody:   `{"error":"unauthorized","error_description":"Invalid or missing token"}`,
+			expectedErrMsg: "unauthorized: Invalid or missing token",
+		},
+		{
+			name:           "Internal Server Error",
+			statusCode:     http.StatusInternalServerError,
+			responseBody:   `{"error":"internal_error","error_description":"Failed to generate upload URL"}`,
+			expectedErrMsg: "internal_error: Failed to generate upload URL",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			server := setupTestServer(t, tc.statusCode, tc.responseBody, nil)
+			defer server.Close()
+
+			client, _ := NewClient(server.URL)
+
+			request := &RequestFileUploadRequest{
+				Filename:    "test.txt",
+				ContentType: "text/plain",
+				TenantID:    "tenant-123",
+			}
+			
+			_, err := client.RequestFileUpload(context.Background(), request)
+
+			if err == nil {
+				t.Fatal("Expected error but got nil")
+			}
+
+			if !strings.Contains(err.Error(), tc.expectedErrMsg) {
+				t.Errorf("Expected error containing %q, got %q", tc.expectedErrMsg, err.Error())
+			}
+		})
+	}
+}
+
+func TestClient_RequestFileUpload_WithTokenProvider(t *testing.T) {
+	expectedResponse := `{"id":"test-id","status":"pending","tenantId":"tenant-123","uploadUrl":"https://example-bucket.s3.amazonaws.com/files/test-id?signed=true","timestamp":"2023-04-01T12:34:56Z"}`
+	
+	server := setupTestServer(t, http.StatusOK, expectedResponse, func(r *http.Request) {
+		// Check Authorization header
+		authHeader := r.Header.Get("Authorization")
+		if authHeader != "Bearer test-token" {
+			t.Errorf("Expected Authorization header with token, got %s", authHeader)
+		}
+	})
+	defer server.Close()
+	
+	// Create a client with a token provider
+	client, _ := NewClientWithOptions(server.URL, WithTokenProvider(&MockTokenProvider{token: "test-token"}))
+	
+	request := &RequestFileUploadRequest{
+		Filename:    "test.txt",
+		ContentType: "text/plain",
+	}
+	
+	// Call RequestFileUpload - the token provider should be used
+	_, err := client.RequestFileUpload(context.Background(), request)
+	if err != nil {
+		t.Fatalf("RequestFileUpload returned unexpected error: %v", err)
+	}
+}
+
+func TestClient_UploadToURL(t *testing.T) {
+	// Create a mock S3 server to test the upload
+	mockS3Server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "PUT" {
+			t.Errorf("Expected PUT request, got %s", r.Method)
+		}
+		
+		contentType := r.Header.Get("Content-Type")
+		if contentType != "text/plain" {
+			t.Errorf("Expected Content-Type text/plain, got %s", contentType)
+		}
+		
+		// Read request body (file content)
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Fatalf("Failed to read request body: %v", err)
+		}
+		
+		if string(body) != "test file content" {
+			t.Errorf("Expected body 'test file content', got %q", string(body))
+		}
+		
+		// Return success response
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer mockS3Server.Close()
+	
+	client, _ := NewClient("http://api.example.com") // Base URL not used for direct upload
+	
+	fileContent := "test file content"
+	fileReader := strings.NewReader(fileContent)
+	
+	resp, err := client.UploadToURL(
+		context.Background(),
+		mockS3Server.URL,
+		"text/plain",
+		fileReader,
+	)
+	if err != nil {
+		t.Fatalf("UploadToURL returned unexpected error: %v", err)
+	}
+	
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("Expected status code 200, got %d", resp.StatusCode)
+	}
+	
+	// Cleanup
+	resp.Body.Close()
+}
+
+func TestClient_UploadToURL_Errors(t *testing.T) {
+	// Test with server that returns an error
+	errorServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+		w.Write([]byte("Access denied"))
+	}))
+	defer errorServer.Close()
+	
+	client, _ := NewClient("http://api.example.com")
+	
+	fileContent := "test file content"
+	fileReader := strings.NewReader(fileContent)
+	
+	_, err := client.UploadToURL(
+		context.Background(),
+		errorServer.URL,
+		"text/plain",
+		fileReader,
+	)
+	
+	if err == nil {
+		t.Fatal("Expected error but got nil")
+	}
+	
+	// Error should mention the status code
+	if !strings.Contains(err.Error(), "403") {
+		t.Errorf("Expected error to contain status code 403, got: %q", err.Error())
+	}
+	
+	// Error should include the response body
+	if !strings.Contains(err.Error(), "Access denied") {
+		t.Errorf("Expected error to contain response body, got: %q", err.Error())
+	}
+	
+	// Test with invalid URL
+	_, err = client.UploadToURL(
+		context.Background(),
+		"http://invalid-url-that-does-not-exist.example",
+		"text/plain",
+		fileReader,
+	)
+	
+	if err == nil {
+		t.Fatal("Expected error with invalid URL but got nil")
+	}
+	
+	// Test with reader that returns an error
+	readerErr := fmt.Errorf("simulated read error")
+	_, err = client.UploadToURL(
+		context.Background(),
+		errorServer.URL,
+		"text/plain",
+		&ErrReader{err: readerErr},
+	)
+	
+	if err == nil {
+		t.Fatal("Expected error with problematic reader but got nil")
+	}
 } 
