@@ -8,12 +8,14 @@ package storage
 type GenerateUploadURLRequest struct {
 	Filename    string `json:"filename"`
 	ContentType string `json:"contentType"`
+	TenantID    string `json:"tenantId,omitempty"` // Optional tenant ID field
 }
 
 // GenerateUploadURLResponse defines the successful response body for generating an upload URL.
 // It contains the pre-signed URL for uploading a file and the HTTP method to use.
 type GenerateUploadURLResponse struct {
 	UploadURL  string `json:"uploadUrl"`
+	S3Key      string `json:"s3Key"`       // S3 key for the uploaded file
 	HTTPMethod string `json:"httpMethod"` // Expected: "PUT"
 	// Add other fields if the API returns them, e.g., required headers
 }
