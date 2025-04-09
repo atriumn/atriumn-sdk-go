@@ -132,14 +132,14 @@ func (c *Client) IngestText(ctx context.Context, request *IngestTextRequest) (*I
 
 // IngestURL ingests content from a URL through the Atriumn Ingest API.
 // The request parameter contains the URL to ingest along with metadata.
-// Returns an ingest response with details about the ingested content or an error.
-func (c *Client) IngestURL(ctx context.Context, request *IngestURLRequest) (*IngestResponse, error) {
+// Returns an asynchronous response with the ID and status (PENDING/QUEUED) of the ingestion job.
+func (c *Client) IngestURL(ctx context.Context, request *IngestURLRequest) (*IngestURLResponse, error) {
 	httpReq, err := c.newRequest(ctx, "POST", "/ingest/url", request)
 	if err != nil {
 		return nil, err
 	}
 
-	var resp IngestResponse
+	var resp IngestURLResponse
 	_, err = c.do(httpReq, &resp)
 	if err != nil {
 		return nil, err

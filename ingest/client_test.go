@@ -195,7 +195,7 @@ func TestClient_IngestText(t *testing.T) {
 }
 
 func TestClient_IngestURL(t *testing.T) {
-	expectedResponse := `{"id":"test-id","status":"pending","tenantId":"tenant-123","userId":"user-456","timestamp":"2023-04-01T12:34:56Z"}`
+	expectedResponse := `{"id":"test-id","status":"pending"}`
 	
 	server := setupTestServer(t, http.StatusOK, expectedResponse, func(r *http.Request) {
 		// Validate request

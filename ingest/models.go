@@ -110,4 +110,12 @@ type ListContentResponse struct {
 	NextToken string        `json:"nextToken,omitempty"`
 }
 
-// ErrorResponse is now provided by the internal/apierror package. 
+// ErrorResponse is now provided by the internal/apierror package.
+
+// IngestURLResponse represents the response from the ingest URL endpoint.
+// After Task 7.1/7.3 changes, this is an immediate, asynchronous response
+// indicating that URL processing has been queued.
+type IngestURLResponse struct {
+	ID     string `json:"id"`          // The unique ID assigned to the content item
+	Status string `json:"status"`      // Should be PENDING/QUEUED
+} 
