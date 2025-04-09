@@ -112,6 +112,9 @@ func NewClientWithOptions(baseURL string, options ...ClientOption) (*Client, err
 // IngestText ingests text content through the Atriumn Ingest API.
 // The request parameter contains the text to ingest along with metadata.
 // Returns an ingest response with details about the ingested content or an error.
+//
+// Deprecated: This method is incompatible with the new upload model. Use RequestTextUpload to get a pre-signed URL, 
+// then perform an HTTP PUT request directly to that URL with the text content.
 func (c *Client) IngestText(ctx context.Context, request *IngestTextRequest) (*IngestResponse, error) {
 	httpReq, err := c.newRequest(ctx, "POST", "/ingest/text", request)
 	if err != nil {
@@ -237,6 +240,26 @@ func (c *Client) RequestFileUpload(ctx context.Context, request *RequestFileUplo
 	_, err = c.do(httpReq, &resp) // Pass pointer to the response struct
 	if err != nil {
 		return nil, err // Error handling (including 4xx/5xx) is done within c.do
+	}
+
+	// Return the successful response
+	return &resp, nil
+}
+
+// RequestTextUpload initiates a text upload by sending metadata to the ingest service.
+// It returns the pre-signed URL required for the client to upload the text content directly to S3.
+func (c *Client) RequestTextUpload(ctx context.Context, request *RequestTextUploadRequest) (*RequestTextUploadResponse, error) {
+	// Create the POST request to /ingest/text endpoint
+	httpReq, err := c.newRequest(ctx, "POST", "/ingest/text", request)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create text upload request: %w", err)
+	}
+
+	// Execute the request and parse the response
+	var resp RequestTextUploadResponse
+	_, err = c.do(httpReq, &resp)
+	if err != nil {
+		return nil, err
 	}
 
 	// Return the successful response

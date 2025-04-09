@@ -1659,12 +1659,194 @@ func TestClient_RequestFileUpload_WithTokenProvider(t *testing.T) {
 	request := &RequestFileUploadRequest{
 		Filename:    "test.txt",
 		ContentType: "text/plain",
+		TenantID:    "tenant-123",
 	}
 	
-	// Call RequestFileUpload - the token provider should be used
 	_, err := client.RequestFileUpload(context.Background(), request)
 	if err != nil {
 		t.Fatalf("RequestFileUpload returned unexpected error: %v", err)
+	}
+}
+
+func TestClient_RequestTextUpload(t *testing.T) {
+	expectedResponse := `{"id":"text-id","status":"uploading","uploadUrl":"https://example-bucket.s3.amazonaws.com/texts/text-id?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=..."}`
+	
+	server := setupTestServer(t, http.StatusOK, expectedResponse, func(r *http.Request) {
+		// Validate request
+		if r.Method != "POST" {
+			t.Errorf("Expected POST request, got %s", r.Method)
+		}
+		if r.URL.Path != "/ingest/text" {
+			t.Errorf("Expected path /ingest/text, got %s", r.URL.Path)
+		}
+		
+		// Check content type is application/json
+		contentType := r.Header.Get("Content-Type")
+		if contentType != "application/json" {
+			t.Errorf("Expected Content-Type application/json, got %s", contentType)
+		}
+		
+		// Parse request body
+		var req RequestTextUploadRequest
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Fatalf("Failed to read request body: %v", err)
+		}
+		
+		err = json.Unmarshal(body, &req)
+		if err != nil {
+			t.Fatalf("Failed to unmarshal request body: %v", err)
+		}
+		
+		// Check request fields
+		if req.ContentType != "text/plain" {
+			t.Errorf("Expected ContentType: text/plain, got %s", req.ContentType)
+		}
+		if req.UserID != "user-456" {
+			t.Errorf("Expected UserID: user-456, got %s", req.UserID)
+		}
+		if req.CallbackURL != "https://example.com/callback" {
+			t.Errorf("Expected CallbackURL: https://example.com/callback, got %s", req.CallbackURL)
+		}
+		
+		// Check metadata
+		if req.Metadata["key"] != "value" {
+			t.Errorf("Expected metadata key 'key' with value 'value', got %s", req.Metadata["key"])
+		}
+	})
+	defer server.Close()
+	
+	client, err := NewClient(server.URL)
+	if err != nil {
+		t.Fatalf("Failed to create client: %v", err)
+	}
+	
+	request := &RequestTextUploadRequest{
+		ContentType: "text/plain",
+		UserID:      "user-456",
+		CallbackURL: "https://example.com/callback",
+		Metadata:    map[string]string{"key": "value"},
+	}
+	
+	resp, err := client.RequestTextUpload(context.Background(), request)
+	if err != nil {
+		t.Fatalf("RequestTextUpload returned unexpected error: %v", err)
+	}
+	
+	if resp.ContentID != "text-id" {
+		t.Errorf("RequestTextUpload response ContentID = %q, want %q", resp.ContentID, "text-id")
+	}
+	if resp.Status != "uploading" {
+		t.Errorf("RequestTextUpload response Status = %q, want %q", resp.Status, "uploading")
+	}
+	if resp.UploadURL != "https://example-bucket.s3.amazonaws.com/texts/text-id?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=..." {
+		t.Errorf("RequestTextUpload response UploadURL = %q, want a pre-signed S3 URL", resp.UploadURL)
+	}
+}
+
+func TestClient_RequestTextUpload_WithEmptyFields(t *testing.T) {
+	expectedResponse := `{"id":"text-id","status":"uploading","uploadUrl":"https://example-bucket.s3.amazonaws.com/texts/text-id?signed=true"}`
+	
+	server := setupTestServer(t, http.StatusOK, expectedResponse, func(r *http.Request) {
+		// Parse request body
+		var req RequestTextUploadRequest
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Fatalf("Failed to read request body: %v", err)
+		}
+		
+		err = json.Unmarshal(body, &req)
+		if err != nil {
+			t.Fatalf("Failed to unmarshal request body: %v", err)
+		}
+		
+		// Check that optional fields are not present in the JSON if empty
+		var jsonMap map[string]interface{}
+		if err := json.Unmarshal(body, &jsonMap); err != nil {
+			t.Fatalf("Failed to unmarshal body to map: %v", err)
+		}
+		
+		if _, exists := jsonMap["userId"]; exists {
+			t.Error("UserID field should not be present in JSON if empty")
+		}
+		
+		if _, exists := jsonMap["metadata"]; exists {
+			t.Error("Metadata field should not be present in JSON if empty")
+		}
+		
+		if _, exists := jsonMap["callbackUrl"]; exists {
+			t.Error("CallbackURL field should not be present in JSON if empty")
+		}
+	})
+	defer server.Close()
+	
+	client, _ := NewClient(server.URL)
+	
+	// Test with empty optional fields
+	request := &RequestTextUploadRequest{
+		ContentType: "text/plain",
+		// UserID, Metadata, and CallbackURL are omitted
+	}
+	
+	resp, err := client.RequestTextUpload(context.Background(), request)
+	if err != nil {
+		t.Fatalf("RequestTextUpload returned unexpected error: %v", err)
+	}
+	
+	if resp.ContentID != "text-id" {
+		t.Errorf("RequestTextUpload response ContentID = %q, want %q", resp.ContentID, "text-id")
+	}
+}
+
+func TestClient_RequestTextUpload_APIErrors(t *testing.T) {
+	testCases := []struct {
+		name           string
+		statusCode     int
+		responseBody   string
+		expectedErrMsg string
+	}{
+		{
+			name:           "Bad Request",
+			statusCode:     http.StatusBadRequest,
+			responseBody:   `{"error":"validation_error","error_description":"Missing required fields"}`,
+			expectedErrMsg: "validation_error: Missing required fields",
+		},
+		{
+			name:           "Unauthorized",
+			statusCode:     http.StatusUnauthorized,
+			responseBody:   `{"error":"unauthorized","error_description":"Invalid or missing token"}`,
+			expectedErrMsg: "unauthorized: Invalid or missing token",
+		},
+		{
+			name:           "Internal Server Error",
+			statusCode:     http.StatusInternalServerError,
+			responseBody:   `{"error":"internal_error","error_description":"Failed to generate upload URL"}`,
+			expectedErrMsg: "internal_error: Failed to generate upload URL",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			server := setupTestServer(t, tc.statusCode, tc.responseBody, nil)
+			defer server.Close()
+
+			client, _ := NewClient(server.URL)
+
+			request := &RequestTextUploadRequest{
+				ContentType: "text/plain",
+				UserID:      "user-456",
+			}
+			
+			_, err := client.RequestTextUpload(context.Background(), request)
+
+			if err == nil {
+				t.Fatal("Expected error but got nil")
+			}
+
+			if !strings.Contains(err.Error(), tc.expectedErrMsg) {
+				t.Errorf("Expected error containing %q, got %q", tc.expectedErrMsg, err.Error())
+			}
+		})
 	}
 }
 
