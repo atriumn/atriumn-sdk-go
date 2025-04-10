@@ -51,6 +51,13 @@ type Client struct {
 
 // NewClient creates a new Atriumn Ingest API client with the specified base URL.
 // It returns an error if the provided URL cannot be parsed.
+//
+// Parameters:
+//   - baseURL: The base URL for the Atriumn Ingest API (required)
+//
+// Returns:
+//   - *Client: A configured Ingest client instance
+//   - error: An error if the URL cannot be parsed
 func NewClient(baseURL string) (*Client, error) {
 	parsedURL, err := url.Parse(baseURL)
 	if err != nil {
@@ -71,6 +78,12 @@ type ClientOption func(*Client)
 // WithHTTPClient sets the HTTP client for the API client.
 // This can be used to customize timeouts, transport settings, or to inject
 // middleware/interceptors for testing or monitoring.
+//
+// Parameters:
+//   - httpClient: The custom HTTP client to use for making API requests
+//
+// Returns:
+//   - ClientOption: A functional option to configure the client
 func WithHTTPClient(httpClient *http.Client) ClientOption {
 	return func(c *Client) {
 		c.HTTPClient = httpClient
@@ -79,6 +92,12 @@ func WithHTTPClient(httpClient *http.Client) ClientOption {
 
 // WithUserAgent sets the user agent for the API client.
 // This string is sent with each request to identify the client.
+//
+// Parameters:
+//   - userAgent: The user agent string to send with API requests
+//
+// Returns:
+//   - ClientOption: A functional option to configure the client
 func WithUserAgent(userAgent string) ClientOption {
 	return func(c *Client) {
 		c.UserAgent = userAgent
@@ -87,6 +106,12 @@ func WithUserAgent(userAgent string) ClientOption {
 
 // WithTokenProvider sets the token provider for the API client.
 // The token provider is used to obtain authentication tokens for API requests.
+//
+// Parameters:
+//   - tp: The TokenProvider implementation to use for authentication
+//
+// Returns:
+//   - ClientOption: A functional option to configure the client
 func WithTokenProvider(tp TokenProvider) ClientOption {
 	return func(c *Client) {
 		c.tokenProvider = tp
@@ -95,7 +120,14 @@ func WithTokenProvider(tp TokenProvider) ClientOption {
 
 // NewClientWithOptions creates a new client with custom options.
 // It allows for flexible configuration of the client through functional options.
-// Returns an error if the base URL is invalid.
+//
+// Parameters:
+//   - baseURL: The base URL for the Atriumn Ingest API (required)
+//   - options: A variadic list of ClientOption functions to customize the client
+//
+// Returns:
+//   - *Client: A configured Ingest client instance
+//   - error: An error if the URL cannot be parsed
 func NewClientWithOptions(baseURL string, options ...ClientOption) (*Client, error) {
 	client, err := NewClient(baseURL)
 	if err != nil {
@@ -110,11 +142,22 @@ func NewClientWithOptions(baseURL string, options ...ClientOption) (*Client, err
 }
 
 // IngestText ingests text content through the Atriumn Ingest API.
-// The request parameter contains the text to ingest along with metadata.
-// Returns an ingest response with details about the ingested content or an error.
 //
-// Deprecated: This method is incompatible with the new upload model. Use RequestTextUpload to get a pre-signed URL, 
+// Deprecated: This method is incompatible with the new upload model. Use RequestTextUpload to get a pre-signed URL,
 // then perform an HTTP PUT request directly to that URL with the text content.
+//
+// Parameters:
+//   - ctx: Context for the API request
+//   - request: IngestTextRequest containing the text content and metadata (required)
+//
+// Returns:
+//   - *IngestResponse: Details about the ingested content if successful
+//   - error: An error if the operation fails, which can be:
+//     * apierror.ErrorResponse with codes like:
+//       - "bad_request" if the request is invalid
+//       - "unauthorized" if authentication fails
+//       - "forbidden" if the caller lacks permissions
+//       - "network_error" if the connection fails
 func (c *Client) IngestText(ctx context.Context, request *IngestTextRequest) (*IngestResponse, error) {
 	httpReq, err := c.newRequest(ctx, "POST", "/ingest/text", request)
 	if err != nil {
@@ -131,8 +174,19 @@ func (c *Client) IngestText(ctx context.Context, request *IngestTextRequest) (*I
 }
 
 // IngestURL ingests content from a URL through the Atriumn Ingest API.
-// The request parameter contains the URL to ingest along with metadata.
-// Returns an asynchronous response with the ID and status (PENDING/QUEUED) of the ingestion job.
+//
+// Parameters:
+//   - ctx: Context for the API request
+//   - request: IngestURLRequest containing the URL to scrape and metadata (required)
+//
+// Returns:
+//   - *IngestURLResponse: An asynchronous response with ID and status (PENDING/QUEUED)
+//   - error: An error if the operation fails, which can be:
+//     * apierror.ErrorResponse with codes like:
+//       - "bad_request" if the URL is invalid
+//       - "unauthorized" if authentication fails
+//       - "forbidden" if the caller lacks permissions
+//       - "network_error" if the connection fails
 func (c *Client) IngestURL(ctx context.Context, request *IngestURLRequest) (*IngestURLResponse, error) {
 	httpReq, err := c.newRequest(ctx, "POST", "/ingest/url", request)
 	if err != nil {
@@ -149,14 +203,29 @@ func (c *Client) IngestURL(ctx context.Context, request *IngestURLRequest) (*Ing
 }
 
 // IngestFile ingests content from a file through the Atriumn Ingest API.
-// Parameters include tenant ID, filename, content type, user ID, and a reader
-// providing the file content to be uploaded.
-// Returns an ingest response with details about the ingested file or an error.
 //
 // Deprecated: This method uses the old single-step multipart/form-data upload pattern
 // which is no longer supported by the refactored ingest service endpoint (/ingest/file).
 // Use RequestFileUpload to get a pre-signed URL, then perform an HTTP PUT request
 // directly to that URL with the file content.
+//
+// Parameters:
+//   - ctx: Context for the API request
+//   - tenantID: Optional identifier for multi-tenant applications
+//   - filename: The name of the file being uploaded (required)
+//   - contentType: The MIME type of the file (required)
+//   - userID: Optional identifier for the user who owns this content
+//   - fileReader: An io.Reader providing the file content (required)
+//
+// Returns:
+//   - *IngestResponse: Details about the ingested file if successful
+//   - error: An error if the operation fails, which can be:
+//     * apierror.ErrorResponse with codes like:
+//       - "bad_request" if the request is invalid
+//       - "unauthorized" if authentication fails
+//       - "forbidden" if the caller lacks permissions
+//       - "network_error" if the connection fails
+//       - "parse_error" if there's an issue with processing the file
 func (c *Client) IngestFile(ctx context.Context, tenantID string, filename string, contentType string, userID string, fileReader io.Reader) (*IngestResponse, error) {
 	// Create multipart writer
 	body := &bytes.Buffer{}
@@ -226,7 +295,20 @@ func (c *Client) IngestFile(ctx context.Context, tenantID string, filename strin
 }
 
 // RequestFileUpload initiates a file upload by sending metadata to the ingest service.
-// It returns the pre-signed URL required for the client to upload the file directly to S3.
+//
+// Parameters:
+//   - ctx: Context for the API request
+//   - request: RequestFileUploadRequest containing file metadata (required fields: Filename, ContentType)
+//
+// Returns:
+//   - *RequestFileUploadResponse: The response containing the pre-signed URL for direct S3 upload
+//   - error: An error if the operation fails, which can be:
+//     * apierror.ErrorResponse with codes like:
+//       - "bad_request" if the request is invalid
+//       - "unauthorized" if authentication fails
+//       - "forbidden" if the caller lacks permissions
+//       - "network_error" if the connection fails
+//       - "server_error" if generating the upload URL fails
 func (c *Client) RequestFileUpload(ctx context.Context, request *RequestFileUploadRequest) (*RequestFileUploadResponse, error) {
 	// Use the internal newRequest helper to create the POST request
 	// The path should now be `/ingest/file` based on service refactor. Double-check service route.
@@ -247,60 +329,81 @@ func (c *Client) RequestFileUpload(ctx context.Context, request *RequestFileUplo
 }
 
 // RequestTextUpload initiates a text upload by sending metadata to the ingest service.
-// It returns the pre-signed URL required for the client to upload the text content directly to S3.
+//
+// Parameters:
+//   - ctx: Context for the API request
+//   - request: RequestTextUploadRequest containing text metadata (required field: ContentType)
+//
+// Returns:
+//   - *RequestTextUploadResponse: The response containing the pre-signed URL for direct S3 upload
+//   - error: An error if the operation fails, which can be:
+//     * apierror.ErrorResponse with codes like:
+//       - "bad_request" if the request is invalid
+//       - "unauthorized" if authentication fails
+//       - "forbidden" if the caller lacks permissions
+//       - "network_error" if the connection fails
+//       - "server_error" if generating the upload URL fails
 func (c *Client) RequestTextUpload(ctx context.Context, request *RequestTextUploadRequest) (*RequestTextUploadResponse, error) {
-	// Create the POST request to /ingest/text endpoint
 	httpReq, err := c.newRequest(ctx, "POST", "/ingest/text", request)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create text upload request: %w", err)
 	}
 
-	// Execute the request and parse the response
 	var resp RequestTextUploadResponse
 	_, err = c.do(httpReq, &resp)
 	if err != nil {
 		return nil, err
 	}
 
-	// Return the successful response
 	return &resp, nil
 }
 
-// UploadToURL uploads file content directly to a pre-signed URL.
-// This is a utility method that can be used after RequestFileUpload to complete the two-step upload process.
-// It handles making the PUT request with the correct headers and returns the HTTP response.
+// UploadToURL uploads content directly to a pre-signed URL.
+//
+// Parameters:
+//   - ctx: Context for the API request
+//   - uploadURL: The pre-signed S3 URL to upload to (required)
+//   - contentType: The MIME type of the content being uploaded (required)
+//   - fileReader: An io.Reader providing the content to upload (required)
+//
+// Returns:
+//   - *http.Response: The raw HTTP response from the upload operation
+//   - error: An error if the upload fails, which can include:
+//     * Network errors if the connection fails
+//     * S3-specific errors if the upload is rejected
+//     * Context cancellation errors
 func (c *Client) UploadToURL(ctx context.Context, uploadURL string, contentType string, fileReader io.Reader) (*http.Response, error) {
+	// Create a new HTTP request with the provided upload URL
 	req, err := http.NewRequestWithContext(ctx, "PUT", uploadURL, fileReader)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create upload request: %w", err)
 	}
 
+	// Set the Content-Type header to the specified value
 	req.Header.Set("Content-Type", contentType)
 
-	// Don't follow redirects for pre-signed URLs
-	client := &http.Client{
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			return http.ErrUseLastResponse
-		},
-	}
-	
-	// Execute request directly without using the c.do method since we want the raw response
-	resp, err := client.Do(req)
+	// Use the client's HTTP client to send the request directly to S3
+	// Note that we're not using c.do() here because this is a direct S3 request,
+	// not an API request that needs to be authenticated or processed through the usual pipeline
+	resp, err := c.HTTPClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to upload to pre-signed URL: %w", err)
+		return nil, fmt.Errorf("failed to upload to URL: %w", err)
 	}
 
-	// Check for successful upload
+	// Check for non-2xx status codes and return appropriate error
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		respBody, _ := io.ReadAll(resp.Body)
-		resp.Body.Close()
-		return nil, fmt.Errorf("upload failed with status %d: %s", resp.StatusCode, string(respBody))
+		defer resp.Body.Close()
+		bodyBytes, readErr := io.ReadAll(resp.Body)
+		if readErr != nil {
+			return nil, fmt.Errorf("upload failed with status %d, and failed to read error response: %w", resp.StatusCode, readErr)
+		}
+		return nil, fmt.Errorf("upload failed with status %d: %s", resp.StatusCode, string(bodyBytes))
 	}
 
 	return resp, nil
 }
 
-// newRequest creates an API request with the specified method, path, and body
+// newRequest creates an API request with the specified method, path and body
 func (c *Client) newRequest(ctx context.Context, method, path string, body interface{}) (*http.Request, error) {
 	u := c.BaseURL.JoinPath(path)
 
@@ -309,13 +412,13 @@ func (c *Client) newRequest(ctx context.Context, method, path string, body inter
 		buf = new(bytes.Buffer)
 		err := json.NewEncoder(buf).Encode(body)
 		if err != nil {
-			return nil, fmt.Errorf("failed to encode request body: %w", err)
+			return nil, err
 		}
 	}
 
 	req, err := http.NewRequestWithContext(ctx, method, u.String(), buf)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
+		return nil, err
 	}
 
 	if body != nil {
@@ -343,8 +446,20 @@ func (c *Client) do(req *http.Request, v interface{}) (*http.Response, error) {
 	return clientutil.ExecuteRequest(req.Context(), c.HTTPClient, req, v)
 }
 
-// GetContentItem retrieves a content item by its ID.
-// Returns the content item details or an error if not found or operation fails.
+// GetContentItem retrieves a specific content item by its ID.
+//
+// Parameters:
+//   - ctx: Context for the API request
+//   - id: The unique identifier of the content item to retrieve (required)
+//
+// Returns:
+//   - *ContentItem: The content item details if found
+//   - error: An error if the operation fails, which can be:
+//     * apierror.ErrorResponse with codes like:
+//       - "not_found" if the content item doesn't exist
+//       - "unauthorized" if authentication fails
+//       - "forbidden" if the caller lacks permissions
+//       - "network_error" if the connection fails
 func (c *Client) GetContentItem(ctx context.Context, id string) (*ContentItem, error) {
 	path := fmt.Sprintf("/content/%s", id)
 	httpReq, err := c.newRequest(ctx, "GET", path, nil)
@@ -361,14 +476,31 @@ func (c *Client) GetContentItem(ctx context.Context, id string) (*ContentItem, e
 	return &resp, nil
 }
 
-// ListContentItems retrieves a list of content items with optional filtering.
-// Parameters allow filtering by status, source type, and pagination through limit and next token.
-// Returns a list of content items or an error if the operation fails.
+// ListContentItems lists content items with optional filters.
+//
+// Parameters:
+//   - ctx: Context for the API request
+//   - statusFilter: Optional filter to match content items with a specific status (e.g., "COMPLETED")
+//   - sourceTypeFilter: Optional filter to match content items with a specific source type (e.g., "TEXT", "URL", "FILE")
+//   - limit: Optional maximum number of items to return
+//   - nextToken: Optional pagination token from a previous list response
+//
+// Returns:
+//   - *ListContentResponse: A list of content items and optional pagination token
+//   - error: An error if the operation fails, which can be:
+//     * apierror.ErrorResponse with codes like:
+//       - "bad_request" if the query parameters are invalid
+//       - "unauthorized" if authentication fails
+//       - "forbidden" if the caller lacks permissions
+//       - "network_error" if the connection fails
 func (c *Client) ListContentItems(ctx context.Context, statusFilter *string, sourceTypeFilter *string, limit *int, nextToken *string) (*ListContentResponse, error) {
-	path := "/content"
-	
-	// Create query parameters
-	q := url.Values{}
+	httpReq, err := c.newRequest(ctx, "GET", "/content", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	// Add query parameters if they are provided
+	q := httpReq.URL.Query()
 	if statusFilter != nil {
 		q.Add("status", *statusFilter)
 	}
@@ -381,14 +513,6 @@ func (c *Client) ListContentItems(ctx context.Context, statusFilter *string, sou
 	if nextToken != nil {
 		q.Add("nextToken", *nextToken)
 	}
-
-	// Create request
-	httpReq, err := c.newRequest(ctx, "GET", path, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	// Add query parameters to the URL
 	httpReq.URL.RawQuery = q.Encode()
 
 	var resp ListContentResponse

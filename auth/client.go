@@ -40,6 +40,13 @@ type Client struct {
 
 // NewClient creates a new Atriumn Auth API client with the specified base URL.
 // It returns an error if the provided URL cannot be parsed.
+//
+// Parameters:
+//   - baseURL: The base URL for the Atriumn Auth API (required)
+//
+// Returns:
+//   - *Client: A configured Auth client instance
+//   - error: An error if the URL cannot be parsed
 func NewClient(baseURL string) (*Client, error) {
 	parsedURL, err := url.Parse(baseURL)
 	if err != nil {
@@ -60,6 +67,12 @@ type ClientOption func(*Client)
 // WithHTTPClient sets the HTTP client for the API client.
 // This can be used to customize timeouts, transport settings, or to inject
 // middleware/interceptors for testing or monitoring.
+//
+// Parameters:
+//   - httpClient: The custom HTTP client to use for making API requests
+//
+// Returns:
+//   - ClientOption: A functional option to configure the client
 func WithHTTPClient(httpClient *http.Client) ClientOption {
 	return func(c *Client) {
 		c.HTTPClient = httpClient
@@ -68,6 +81,12 @@ func WithHTTPClient(httpClient *http.Client) ClientOption {
 
 // WithUserAgent sets the user agent for the API client.
 // This string is sent with each request to identify the client.
+//
+// Parameters:
+//   - userAgent: The user agent string to send with API requests
+//
+// Returns:
+//   - ClientOption: A functional option to configure the client
 func WithUserAgent(userAgent string) ClientOption {
 	return func(c *Client) {
 		c.UserAgent = userAgent
@@ -76,7 +95,14 @@ func WithUserAgent(userAgent string) ClientOption {
 
 // NewClientWithOptions creates a new client with custom options.
 // It allows for flexible configuration of the client through functional options.
-// Returns an error if the base URL is invalid.
+//
+// Parameters:
+//   - baseURL: The base URL for the Atriumn Auth API (required)
+//   - options: A variadic list of ClientOption functions to customize the client
+//
+// Returns:
+//   - *Client: A configured Auth client instance
+//   - error: An error if the URL cannot be parsed
 func NewClientWithOptions(baseURL string, options ...ClientOption) (*Client, error) {
 	client, err := NewClient(baseURL)
 	if err != nil {
@@ -91,7 +117,19 @@ func NewClientWithOptions(baseURL string, options ...ClientOption) (*Client, err
 }
 
 // CreateClientCredential creates a new client credential with the provided parameters.
-// It returns the created credential including the client ID and secret, or an error if the operation fails.
+//
+// Parameters:
+//   - ctx: Context for the API request
+//   - req: ClientCredentialCreateRequest containing credential details (required fields: IssuedTo, Scopes)
+//
+// Returns:
+//   - *ClientCredentialCreateResponse: The created credential including the client ID and secret
+//   - error: An error if the creation fails, which can be:
+//     * apierror.ErrorResponse with codes like:
+//       - "bad_request" if the request is invalid
+//       - "unauthorized" if authentication fails
+//       - "forbidden" if the caller lacks permissions
+//       - "network_error" if the connection fails
 func (c *Client) CreateClientCredential(ctx context.Context, req ClientCredentialCreateRequest) (*ClientCredentialCreateResponse, error) {
 	httpReq, err := c.newRequest(ctx, "POST", "/admin/credentials", req)
 	if err != nil {
@@ -112,8 +150,23 @@ func (c *Client) CreateClientCredential(ctx context.Context, req ClientCredentia
 }
 
 // ListClientCredentials lists client credentials with optional filters.
-// Parameters allow filtering by issuedTo, tenantID, scope, and active status.
-// Returns a list of matching credentials or an error if the operation fails.
+//
+// Parameters:
+//   - ctx: Context for the API request
+//   - issuedToFilter: Optional filter to match the IssuedTo field
+//   - tenantIDFilter: Optional filter to match the TenantID field
+//   - scopeFilter: Optional filter to match credentials with a specific scope
+//   - activeOnly: If true, return only active credentials
+//   - inactiveOnly: If true, return only inactive credentials
+//
+// Returns:
+//   - *ListClientCredentialsResponse: A list of matching credentials
+//   - error: An error if the operation fails, which can be:
+//     * apierror.ErrorResponse with codes like:
+//       - "unauthorized" if authentication fails
+//       - "forbidden" if the caller lacks permissions
+//       - "network_error" if the connection fails
+//       - "server_error" if the API server experiences an error
 func (c *Client) ListClientCredentials(ctx context.Context, issuedToFilter, tenantIDFilter, scopeFilter string, activeOnly, inactiveOnly bool) (*ListClientCredentialsResponse, error) {
 	httpReq, err := c.newRequest(ctx, "GET", "/admin/credentials", nil)
 	if err != nil {
@@ -148,7 +201,19 @@ func (c *Client) ListClientCredentials(ctx context.Context, issuedToFilter, tena
 }
 
 // GetClientCredential gets a client credential by its ID.
-// Returns the credential details or an error if not found or operation fails.
+//
+// Parameters:
+//   - ctx: Context for the API request
+//   - id: The unique identifier of the credential to retrieve (required)
+//
+// Returns:
+//   - *ClientCredentialResponse: The credential details (without the secret)
+//   - error: An error if the operation fails, which can be:
+//     * apierror.ErrorResponse with codes like:
+//       - "not_found" if the credential doesn't exist
+//       - "unauthorized" if authentication fails
+//       - "forbidden" if the caller lacks permissions
+//       - "network_error" if the connection fails
 func (c *Client) GetClientCredential(ctx context.Context, id string) (*ClientCredentialResponse, error) {
 	path := fmt.Sprintf("/admin/credentials/%s", id)
 	httpReq, err := c.newRequest(ctx, "GET", path, nil)
@@ -166,8 +231,21 @@ func (c *Client) GetClientCredential(ctx context.Context, id string) (*ClientCre
 }
 
 // UpdateClientCredential updates a client credential with the specified ID.
-// The req parameter specifies which fields to update.
-// Returns the updated credential details or an error if operation fails.
+//
+// Parameters:
+//   - ctx: Context for the API request
+//   - id: The unique identifier of the credential to update (required)
+//   - req: ClientCredentialUpdateRequest containing fields to update (Active, Scopes, Description)
+//
+// Returns:
+//   - *ClientCredentialResponse: The updated credential details
+//   - error: An error if the operation fails, which can be:
+//     * apierror.ErrorResponse with codes like:
+//       - "not_found" if the credential doesn't exist
+//       - "bad_request" if the request is invalid
+//       - "unauthorized" if authentication fails
+//       - "forbidden" if the caller lacks permissions
+//       - "network_error" if the connection fails
 func (c *Client) UpdateClientCredential(ctx context.Context, id string, req ClientCredentialUpdateRequest) (*ClientCredentialResponse, error) {
 	path := fmt.Sprintf("/admin/credentials/%s", id)
 	httpReq, err := c.newRequest(ctx, "PATCH", path, req)
@@ -185,7 +263,18 @@ func (c *Client) UpdateClientCredential(ctx context.Context, id string, req Clie
 }
 
 // DeleteClientCredential deletes a client credential with the specified ID.
-// Returns an error if the deletion fails or the credential does not exist.
+//
+// Parameters:
+//   - ctx: Context for the API request
+//   - id: The unique identifier of the credential to delete (required)
+//
+// Returns:
+//   - error: An error if the deletion fails, which can be:
+//     * apierror.ErrorResponse with codes like:
+//       - "not_found" if the credential doesn't exist
+//       - "unauthorized" if authentication fails
+//       - "forbidden" if the caller lacks permissions
+//       - "network_error" if the connection fails
 func (c *Client) DeleteClientCredential(ctx context.Context, id string) error {
 	path := fmt.Sprintf("/admin/credentials/%s", id)
 	httpReq, err := c.newRequest(ctx, "DELETE", path, nil)
@@ -241,7 +330,16 @@ func (c *Client) do(req *http.Request, v interface{}) (*http.Response, error) {
 }
 
 // Health checks the health status of the Auth API.
-// Returns the service health status or an error if the operation fails.
+//
+// Parameters:
+//   - ctx: Context for the API request
+//
+// Returns:
+//   - *HealthResponse: The service health status, typically containing a "status" field
+//   - error: An error if the operation fails, which can be:
+//     * apierror.ErrorResponse with codes like:
+//       - "network_error" if the connection fails
+//       - "server_error" if the API server experiences an error
 func (c *Client) Health(ctx context.Context) (*HealthResponse, error) {
 	req, err := c.newRequest(ctx, "GET", "/health", nil)
 	if err != nil {
@@ -257,24 +355,37 @@ func (c *Client) Health(ctx context.Context) (*HealthResponse, error) {
 	return &resp, nil
 }
 
-// GetClientCredentialsToken obtains an OAuth token using client credentials flow.
-// Parameters include clientID, clientSecret, and optional scope.
-// Returns a token response or an error if authentication fails.
+// GetClientCredentialsToken obtains an OAuth token using the client credentials flow.
+//
+// Parameters:
+//   - ctx: Context for the API request
+//   - clientID: The client identifier (required)
+//   - clientSecret: The client secret (required)
+//   - scope: Optional space-delimited list of requested permission scopes
+//
+// Returns:
+//   - *TokenResponse: The token response containing access_token, token_type, and expires_in
+//   - error: An error if the operation fails, which can be:
+//     * apierror.ErrorResponse with codes like:
+//       - "bad_request" if the credentials are invalid
+//       - "unauthorized" if authentication fails
+//       - "network_error" if the connection fails
+//       - "server_error" if the API server experiences an error
 func (c *Client) GetClientCredentialsToken(ctx context.Context, clientID, clientSecret, scope string) (*TokenResponse, error) {
-	tokenReq := ClientCredentialsRequest{
+	req := ClientCredentialsRequest{
 		GrantType:    "client_credentials",
 		ClientID:     clientID,
 		ClientSecret: clientSecret,
 		Scope:        scope,
 	}
 
-	req, err := c.newRequest(ctx, "POST", "/auth/token", tokenReq)
+	httpReq, err := c.newRequest(ctx, "POST", "/oauth/token", req)
 	if err != nil {
 		return nil, err
 	}
 
 	var resp TokenResponse
-	_, err = c.do(req, &resp)
+	_, err = c.do(httpReq, &resp)
 	if err != nil {
 		return nil, err
 	}
@@ -282,22 +393,36 @@ func (c *Client) GetClientCredentialsToken(ctx context.Context, clientID, client
 	return &resp, nil
 }
 
-// SignupUser registers a new user with email, password, and optional attributes.
-// Returns a signup response containing the user ID, or an error if signup fails.
+// SignupUser registers a new user with the provided email and password.
+//
+// Parameters:
+//   - ctx: Context for the API request
+//   - email: The user's email address (required)
+//   - password: The user's chosen password (required)
+//   - attributes: Optional map of additional user attributes
+//
+// Returns:
+//   - *UserSignupResponse: The signup response containing the user ID
+//   - error: An error if the operation fails, which can be:
+//     * apierror.ErrorResponse with codes like:
+//       - "bad_request" if the email or password is invalid
+//       - "conflict" if the user already exists
+//       - "network_error" if the connection fails
+//       - "server_error" if the API server experiences an error
 func (c *Client) SignupUser(ctx context.Context, email, password string, attributes map[string]string) (*UserSignupResponse, error) {
-	signupReq := UserSignupRequest{
+	req := UserSignupRequest{
 		Email:      email,
 		Password:   password,
 		Attributes: attributes,
 	}
 
-	req, err := c.newRequest(ctx, "POST", "/auth/signup", signupReq)
+	httpReq, err := c.newRequest(ctx, "POST", "/auth/signup", req)
 	if err != nil {
 		return nil, err
 	}
 
 	var resp UserSignupResponse
-	_, err = c.do(req, &resp)
+	_, err = c.do(httpReq, &resp)
 	if err != nil {
 		return nil, err
 	}
@@ -305,61 +430,99 @@ func (c *Client) SignupUser(ctx context.Context, email, password string, attribu
 	return &resp, nil
 }
 
-// ConfirmSignup confirms a user registration with the verification code.
-// Returns an error if confirmation fails or the code is invalid.
+// ConfirmSignup confirms a user signup with a verification code.
+//
+// Parameters:
+//   - ctx: Context for the API request
+//   - username: The email address or username of the account to confirm (required)
+//   - code: The verification code sent to the user during signup (required)
+//
+// Returns:
+//   - error: An error if the confirmation fails, which can be:
+//     * apierror.ErrorResponse with codes like:
+//       - "bad_request" if the username or code is invalid
+//       - "not_found" if the user doesn't exist
+//       - "expired_code" if the confirmation code has expired
+//       - "network_error" if the connection fails
 func (c *Client) ConfirmSignup(ctx context.Context, username, code string) error {
-	confirmReq := ConfirmSignupRequest{
+	req := ConfirmSignupRequest{
 		Username:         username,
 		ConfirmationCode: code,
 	}
 
-	req, err := c.newRequest(ctx, "POST", "/auth/signup/confirm", confirmReq)
+	httpReq, err := c.newRequest(ctx, "POST", "/auth/confirm-signup", req)
 	if err != nil {
 		return err
 	}
 
-	_, err = c.do(req, nil)
+	_, err = c.do(httpReq, nil)
 	return err
 }
 
-// ResendConfirmationCode resends the confirmation code to the specified user.
-// Returns details about the code delivery or an error if the operation fails.
+// ResendConfirmationCode resends a confirmation code to a user.
+//
+// Parameters:
+//   - ctx: Context for the API request
+//   - username: The email address or username of the account (required)
+//
+// Returns:
+//   - *CodeDeliveryDetails: Information about how the code was delivered
+//   - error: An error if the operation fails, which can be:
+//     * apierror.ErrorResponse with codes like:
+//       - "bad_request" if the username is invalid
+//       - "not_found" if the user doesn't exist
+//       - "rate_limited" if too many codes have been requested
+//       - "network_error" if the connection fails
 func (c *Client) ResendConfirmationCode(ctx context.Context, username string) (*CodeDeliveryDetails, error) {
-	resendReq := ResendConfirmationCodeRequest{
+	req := ResendConfirmationCodeRequest{
 		Username: username,
 	}
 
-	req, err := c.newRequest(ctx, "POST", "/auth/signup/resend", resendReq)
+	httpReq, err := c.newRequest(ctx, "POST", "/auth/resend-confirmation-code", req)
 	if err != nil {
 		return nil, err
 	}
 
 	var resp struct {
-		CodeDeliveryDetails CodeDeliveryDetails `json:"code_delivery_details"`
+		CodeDeliveryDetails *CodeDeliveryDetails `json:"codeDeliveryDetails"`
 	}
-	_, err = c.do(req, &resp)
+	_, err = c.do(httpReq, &resp)
 	if err != nil {
 		return nil, err
 	}
 
-	return &resp.CodeDeliveryDetails, nil
+	return resp.CodeDeliveryDetails, nil
 }
 
-// LoginUser authenticates a user with username and password.
-// Returns a token response if authentication succeeds, or an error if it fails.
+// LoginUser authenticates a user with username/email and password.
+//
+// Parameters:
+//   - ctx: Context for the API request
+//   - username: The email address or username (required)
+//   - password: The user's password (required)
+//
+// Returns:
+//   - *TokenResponse: The token response containing access_token, id_token, refresh_token
+//   - error: An error if the login fails, which can be:
+//     * apierror.ErrorResponse with codes like:
+//       - "bad_request" if the username or password is invalid
+//       - "unauthorized" if authentication fails
+//       - "not_confirmed" if the user account is not confirmed
+//       - "user_disabled" if the account is disabled
+//       - "network_error" if the connection fails
 func (c *Client) LoginUser(ctx context.Context, username, password string) (*TokenResponse, error) {
-	loginReq := UserLoginRequest{
+	req := UserLoginRequest{
 		Username: username,
 		Password: password,
 	}
 
-	req, err := c.newRequest(ctx, "POST", "/auth/login", loginReq)
+	httpReq, err := c.newRequest(ctx, "POST", "/auth/login", req)
 	if err != nil {
 		return nil, err
 	}
 
 	var resp TokenResponse
-	_, err = c.do(req, &resp)
+	_, err = c.do(httpReq, &resp)
 	if err != nil {
 		return nil, err
 	}
@@ -368,35 +531,57 @@ func (c *Client) LoginUser(ctx context.Context, username, password string) (*Tok
 }
 
 // LogoutUser logs out a user by invalidating their access token.
-// Returns an error if the logout operation fails.
+//
+// Parameters:
+//   - ctx: Context for the API request
+//   - accessToken: The JWT token to invalidate (required)
+//
+// Returns:
+//   - error: An error if the logout fails, which can be:
+//     * apierror.ErrorResponse with codes like:
+//       - "bad_request" if the token is invalid
+//       - "unauthorized" if the token is already invalid
+//       - "network_error" if the connection fails
 func (c *Client) LogoutUser(ctx context.Context, accessToken string) error {
-	logoutReq := UserLogoutRequest{
+	req := UserLogoutRequest{
 		AccessToken: accessToken,
 	}
 
-	req, err := c.newRequest(ctx, "POST", "/auth/logout", logoutReq)
+	httpReq, err := c.newRequest(ctx, "POST", "/auth/logout", req)
 	if err != nil {
 		return err
 	}
 
-	_, err = c.do(req, nil)
+	_, err = c.do(httpReq, nil)
 	return err
 }
 
-// RequestPasswordReset initiates a password reset process for the specified email.
-// Returns password reset response with delivery details, or an error if the operation fails.
+// RequestPasswordReset initiates a password reset for a user.
+//
+// Parameters:
+//   - ctx: Context for the API request
+//   - email: The email address of the account to reset (required)
+//
+// Returns:
+//   - *PasswordResetResponse: Information about how the reset code was delivered
+//   - error: An error if the operation fails, which can be:
+//     * apierror.ErrorResponse with codes like:
+//       - "bad_request" if the email is invalid
+//       - "not_found" if the user doesn't exist
+//       - "rate_limited" if too many resets have been requested
+//       - "network_error" if the connection fails
 func (c *Client) RequestPasswordReset(ctx context.Context, email string) (*PasswordResetResponse, error) {
-	resetReq := PasswordResetRequest{
+	req := PasswordResetRequest{
 		Email: email,
 	}
 
-	req, err := c.newRequest(ctx, "POST", "/auth/password/reset", resetReq)
+	httpReq, err := c.newRequest(ctx, "POST", "/auth/forgot-password", req)
 	if err != nil {
 		return nil, err
 	}
 
 	var resp PasswordResetResponse
-	_, err = c.do(req, &resp)
+	_, err = c.do(httpReq, &resp)
 	if err != nil {
 		return nil, err
 	}
@@ -404,37 +589,60 @@ func (c *Client) RequestPasswordReset(ctx context.Context, email string) (*Passw
 	return &resp, nil
 }
 
-// ConfirmPasswordReset completes a password reset with the verification code and new password.
-// Returns an error if the password reset fails or the code is invalid.
+// ConfirmPasswordReset completes a password reset with a verification code.
+//
+// Parameters:
+//   - ctx: Context for the API request
+//   - email: The email address of the account being reset (required)
+//   - code: The verification code sent to the user (required)
+//   - newPassword: The new password to set for the account (required)
+//
+// Returns:
+//   - error: An error if the confirmation fails, which can be:
+//     * apierror.ErrorResponse with codes like:
+//       - "bad_request" if the email, code, or password is invalid
+//       - "not_found" if the user doesn't exist
+//       - "expired_code" if the reset code has expired
+//       - "network_error" if the connection fails
 func (c *Client) ConfirmPasswordReset(ctx context.Context, email, code, newPassword string) error {
-	confirmReq := ConfirmPasswordResetRequest{
+	req := ConfirmPasswordResetRequest{
 		Email:       email,
 		Code:        code,
 		NewPassword: newPassword,
 	}
 
-	req, err := c.newRequest(ctx, "POST", "/auth/password/confirm", confirmReq)
+	httpReq, err := c.newRequest(ctx, "POST", "/auth/confirm-forgot-password", req)
 	if err != nil {
 		return err
 	}
 
-	_, err = c.do(req, nil)
+	_, err = c.do(httpReq, nil)
 	return err
 }
 
-// GetUserProfile retrieves the profile of the authenticated user.
-// Requires a valid access token for authorization.
-// Returns the user profile or an error if retrieval fails.
+// GetUserProfile retrieves the profile of an authenticated user.
+//
+// Parameters:
+//   - ctx: Context for the API request
+//   - accessToken: The JWT access token of the authenticated user (required)
+//
+// Returns:
+//   - *UserProfileResponse: The user profile containing username and attributes
+//   - error: An error if the operation fails, which can be:
+//     * apierror.ErrorResponse with codes like:
+//       - "unauthorized" if the token is invalid or expired
+//       - "not_found" if the user doesn't exist
+//       - "network_error" if the connection fails
 func (c *Client) GetUserProfile(ctx context.Context, accessToken string) (*UserProfileResponse, error) {
-	req, err := c.newRequest(ctx, "GET", "/auth/me", nil)
+	httpReq, err := c.newRequest(ctx, "GET", "/auth/profile", nil)
 	if err != nil {
 		return nil, err
 	}
 
-	req.Header.Set("Authorization", "Bearer "+accessToken)
+	httpReq.Header.Set("Authorization", "Bearer "+accessToken)
 
 	var resp UserProfileResponse
-	_, err = c.do(req, &resp)
+	_, err = c.do(httpReq, &resp)
 	if err != nil {
 		return nil, err
 	}
