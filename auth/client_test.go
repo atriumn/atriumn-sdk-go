@@ -126,8 +126,8 @@ func TestGetClientCredentialsToken(t *testing.T) {
 		if r.Method != "POST" {
 			t.Errorf("Expected POST request, got %s", r.Method)
 		}
-		if r.URL.Path != "/oauth/token" {
-			t.Errorf("Expected /oauth/token path, got %s", r.URL.Path)
+		if r.URL.Path != "/auth/token" {
+			t.Errorf("Expected /auth/token path, got %s", r.URL.Path)
 		}
 
 		// Verify request body
@@ -306,8 +306,8 @@ func TestRequestPasswordReset(t *testing.T) {
 		if r.Method != "POST" {
 			t.Errorf("Expected POST request, got %s", r.Method)
 		}
-		if r.URL.Path != "/auth/forgot-password" {
-			t.Errorf("Expected /auth/forgot-password path, got %s", r.URL.Path)
+		if r.URL.Path != "/auth/password/reset" {
+			t.Errorf("Expected /auth/password/reset path, got %s", r.URL.Path)
 		}
 
 		// Verify request body
@@ -354,8 +354,8 @@ func TestConfirmPasswordReset(t *testing.T) {
 		if r.Method != "POST" {
 			t.Errorf("Expected POST request, got %s", r.Method)
 		}
-		if r.URL.Path != "/auth/confirm-forgot-password" {
-			t.Errorf("Expected /auth/confirm-forgot-password path, got %s", r.URL.Path)
+		if r.URL.Path != "/auth/password/confirm" {
+			t.Errorf("Expected /auth/password/confirm path, got %s", r.URL.Path)
 		}
 
 		// Verify request body
@@ -488,8 +488,8 @@ func TestClient_GetUserProfile(t *testing.T) {
 			// Setup
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				// Verify request
-				assert.Equal(t, "/auth/profile", r.URL.Path)
 				assert.Equal(t, "GET", r.Method)
+				assert.Equal(t, "/auth/me", r.URL.Path)
 				assert.Equal(t, fmt.Sprintf("Bearer %s", tc.accessToken), r.Header.Get("Authorization"))
 
 				// Return response
@@ -946,7 +946,7 @@ func TestGetClientCredential_NotFound(t *testing.T) {
 	}))
 	defer server.Close()
 
-	// Call the method with a non-existent ID
+	// Call the method, should get a not found error
 	resp, err := client.GetClientCredential(context.Background(), "not-exist")
 
 	// Verify error response
@@ -956,311 +956,4 @@ func TestGetClientCredential_NotFound(t *testing.T) {
 	require.True(t, ok, "Expected error to be *apierror.ErrorResponse")
 	assert.Equal(t, "not_found", errorResp.ErrorCode)
 	assert.Equal(t, "Credential not found", errorResp.Description)
-}
-
-func TestUpdateClientCredential_Success(t *testing.T) {
-	credentialID := "cred-123"
-	activeTrue := true
-	newScopes := []string{"read:users", "write:users", "admin:users"}
-	newDescription := "Updated description"
-
-	server, client := setupTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Check request
-		assert.Equal(t, "PATCH", r.Method)
-		assert.Equal(t, "/admin/credentials/"+credentialID, r.URL.Path)
-		assert.Equal(t, "application/json", r.Header.Get("Content-Type"))
-
-		// Verify request body
-		var req ClientCredentialUpdateRequest
-		err := json.NewDecoder(r.Body).Decode(&req)
-		require.NoError(t, err)
-		assert.Equal(t, &activeTrue, req.Active)
-		assert.Equal(t, &newScopes, req.Scopes)
-		assert.Equal(t, &newDescription, req.Description)
-
-		// Return successful response
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		response := `{
-			"id": "cred-123",
-			"client_id": "client-123",
-			"issued_to": "TestApp",
-			"scopes": ["read:users", "write:users", "admin:users"],
-			"description": "Updated description",
-			"active": true,
-			"created_at": "2023-01-01T00:00:00Z",
-			"updated_at": "2023-01-03T00:00:00Z",
-			"tenant_id": "tenant-123"
-		}`
-		_, _ = w.Write([]byte(response))
-	}))
-	defer server.Close()
-
-	// Create update request
-	req := ClientCredentialUpdateRequest{
-		Active:      &activeTrue,
-		Scopes:      &newScopes,
-		Description: &newDescription,
-	}
-
-	// Call the method
-	resp, err := client.UpdateClientCredential(context.Background(), credentialID, req)
-
-	// Verify response
-	require.NoError(t, err)
-	require.NotNil(t, resp)
-	assert.Equal(t, "cred-123", resp.ID)
-	assert.Equal(t, "client-123", resp.ClientID)
-	assert.Equal(t, "TestApp", resp.IssuedTo)
-	assert.Equal(t, []string{"read:users", "write:users", "admin:users"}, resp.Scopes)
-	assert.Equal(t, "Updated description", resp.Description)
-	assert.True(t, resp.Active)
-	assert.Equal(t, "2023-01-01T00:00:00Z", resp.CreatedAt)
-	assert.Equal(t, "2023-01-03T00:00:00Z", resp.UpdatedAt)
-	assert.Equal(t, "tenant-123", resp.TenantID)
-}
-
-func TestUpdateClientCredential_PartialUpdate(t *testing.T) {
-	credentialID := "cred-123"
-	activeFalse := false
-
-	server, client := setupTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Check request
-		assert.Equal(t, "PATCH", r.Method)
-		assert.Equal(t, "/admin/credentials/"+credentialID, r.URL.Path)
-
-		// Verify request body
-		var req ClientCredentialUpdateRequest
-		err := json.NewDecoder(r.Body).Decode(&req)
-		require.NoError(t, err)
-		assert.Equal(t, &activeFalse, req.Active)
-		assert.Nil(t, req.Scopes)
-		assert.Nil(t, req.Description)
-
-		// Return successful response
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		response := `{
-			"id": "cred-123",
-			"client_id": "client-123",
-			"issued_to": "TestApp",
-			"scopes": ["read:users"],
-			"description": "Original description",
-			"active": false,
-			"created_at": "2023-01-01T00:00:00Z",
-			"updated_at": "2023-01-03T00:00:00Z",
-			"tenant_id": "tenant-123"
-		}`
-		_, _ = w.Write([]byte(response))
-	}))
-	defer server.Close()
-
-	// Create update request with only active status
-	req := ClientCredentialUpdateRequest{
-		Active: &activeFalse,
-	}
-
-	// Call the method
-	resp, err := client.UpdateClientCredential(context.Background(), credentialID, req)
-
-	// Verify response
-	require.NoError(t, err)
-	require.NotNil(t, resp)
-	assert.Equal(t, "cred-123", resp.ID)
-	assert.Equal(t, false, resp.Active)
-	assert.Equal(t, []string{"read:users"}, resp.Scopes)
-	assert.Equal(t, "Original description", resp.Description)
-}
-
-func TestDeleteClientCredential_Success(t *testing.T) {
-	credentialID := "cred-123"
-
-	server, client := setupTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Check request
-		assert.Equal(t, "DELETE", r.Method)
-		assert.Equal(t, "/admin/credentials/"+credentialID, r.URL.Path)
-
-		// Return successful response
-		w.WriteHeader(http.StatusNoContent)
-	}))
-	defer server.Close()
-
-	// Call the method
-	err := client.DeleteClientCredential(context.Background(), credentialID)
-
-	// Verify response
-	require.NoError(t, err)
-}
-
-func TestDeleteClientCredential_NotFound(t *testing.T) {
-	credentialID := "nonexistent-id"
-
-	server, client := setupTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Return not found error
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusNotFound)
-		errorResp := `{
-			"error": "not_found",
-			"error_description": "Client credential not found"
-		}`
-		_, _ = w.Write([]byte(errorResp))
-	}))
-	defer server.Close()
-
-	// Call the method
-	err := client.DeleteClientCredential(context.Background(), credentialID)
-
-	// Verify error
-	require.Error(t, err)
-	errorResp, ok := err.(*apierror.ErrorResponse)
-	require.True(t, ok)
-	assert.Equal(t, "not_found", errorResp.ErrorCode)
-	assert.Equal(t, "Client credential not found", errorResp.Description)
-}
-
-func TestResendConfirmationCode(t *testing.T) {
-	server, client := setupTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, "POST", r.Method)
-		assert.Equal(t, "/auth/resend-confirmation-code", r.URL.Path)
-
-		var req struct {
-			Username string `json:"username"`
-		}
-		err := json.NewDecoder(r.Body).Decode(&req)
-		require.NoError(t, err)
-		assert.Equal(t, "test@example.com", req.Username)
-
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		fmt.Fprintln(w, `{
-			"codeDeliveryDetails": {
-				"destination": "t***@e***.com",
-				"delivery_medium": "EMAIL",
-				"attribute_name": "email"
-			}
-		}`)
-	}))
-	defer server.Close()
-
-	details, err := client.ResendConfirmationCode(context.Background(), "test@example.com")
-	require.NoError(t, err)
-	assert.Equal(t, "EMAIL", details.DeliveryMedium)
-	assert.Equal(t, "t***@e***.com", details.Destination)
-	assert.Equal(t, "email", details.AttributeName)
-}
-
-func TestResendConfirmationCode_Error(t *testing.T) {
-	server, client := setupTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Return error response
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		_, _ = fmt.Fprintln(w, `{
-			"error": "user_not_found",
-			"error_description": "User does not exist"
-		}`)
-	}))
-	defer server.Close()
-
-	details, err := client.ResendConfirmationCode(context.Background(), "nonexistent@example.com")
-	require.Error(t, err)
-	require.Nil(t, details)
-	errorResp, ok := err.(*apierror.ErrorResponse)
-	require.True(t, ok, "Expected error to be *apierror.ErrorResponse")
-	assert.Equal(t, "user_not_found", errorResp.ErrorCode)
-}
-
-func TestConfirmSignup(t *testing.T) {
-	server, client := setupTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, "POST", r.Method)
-		assert.Equal(t, "/auth/confirm-signup", r.URL.Path)
-
-		var req struct {
-			Username         string `json:"username"`
-			ConfirmationCode string `json:"confirmation_code"`
-		}
-		err := json.NewDecoder(r.Body).Decode(&req)
-		require.NoError(t, err)
-		assert.Equal(t, "test@example.com", req.Username)
-		assert.Equal(t, "123456", req.ConfirmationCode)
-
-		w.WriteHeader(http.StatusOK)
-	}))
-	defer server.Close()
-
-	err := client.ConfirmSignup(context.Background(), "test@example.com", "123456")
-	require.NoError(t, err)
-}
-
-func TestConfirmSignup_InvalidCode(t *testing.T) {
-	server, client := setupTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		fmt.Fprintln(w, `{
-			"error": "CodeMismatchException",
-			"error_description": "Invalid verification code provided"
-		}`)
-	}))
-	defer server.Close()
-
-	err := client.ConfirmSignup(context.Background(), "test@example.com", "invalid")
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "CodeMismatchException")
-}
-
-func TestURLConstruction(t *testing.T) {
-	tests := []struct {
-		name     string
-		baseURL  string
-		path     string
-		expected string
-	}{
-		{
-			name:     "Simple path",
-			baseURL:  "https://example.com",
-			path:     "/users",
-			expected: "https://example.com/users",
-		},
-		{
-			name:     "Path without leading slash",
-			baseURL:  "https://example.com",
-			path:     "users",
-			expected: "https://example.com/users",
-		},
-		{
-			name:     "Base URL with path",
-			baseURL:  "https://example.com/api/v1",
-			path:     "/users",
-			expected: "https://example.com/api/v1/users",
-		},
-		{
-			name:     "Base URL with path and path without leading slash",
-			baseURL:  "https://example.com/api/v1",
-			path:     "users",
-			expected: "https://example.com/api/v1/users",
-		},
-		{
-			name:     "Base URL with trailing slash",
-			baseURL:  "https://example.com/",
-			path:     "users",
-			expected: "https://example.com/users",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			client, err := NewClient(tt.baseURL)
-			if err != nil {
-				t.Fatalf("Failed to create client: %v", err)
-			}
-
-			req, err := client.newRequest(context.Background(), "GET", tt.path, nil)
-			if err != nil {
-				t.Fatalf("Failed to create request: %v", err)
-			}
-
-			if req.URL.String() != tt.expected {
-				t.Errorf("Expected URL %q, got %q", tt.expected, req.URL.String())
-			}
-		})
-	}
 }

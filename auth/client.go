@@ -379,7 +379,7 @@ func (c *Client) GetClientCredentialsToken(ctx context.Context, clientID, client
 		Scope:        scope,
 	}
 
-	httpReq, err := c.newRequest(ctx, "POST", "/oauth/token", req)
+	httpReq, err := c.newRequest(ctx, "POST", "/auth/token", req)
 	if err != nil {
 		return nil, err
 	}
@@ -450,7 +450,7 @@ func (c *Client) ConfirmSignup(ctx context.Context, username, code string) error
 		ConfirmationCode: code,
 	}
 
-	httpReq, err := c.newRequest(ctx, "POST", "/auth/confirm-signup", req)
+	httpReq, err := c.newRequest(ctx, "POST", "/auth/signup/confirm", req)
 	if err != nil {
 		return err
 	}
@@ -478,7 +478,7 @@ func (c *Client) ResendConfirmationCode(ctx context.Context, username string) (*
 		Username: username,
 	}
 
-	httpReq, err := c.newRequest(ctx, "POST", "/auth/resend-confirmation-code", req)
+	httpReq, err := c.newRequest(ctx, "POST", "/auth/signup/resend", req)
 	if err != nil {
 		return nil, err
 	}
@@ -575,7 +575,7 @@ func (c *Client) RequestPasswordReset(ctx context.Context, email string) (*Passw
 		Email: email,
 	}
 
-	httpReq, err := c.newRequest(ctx, "POST", "/auth/forgot-password", req)
+	httpReq, err := c.newRequest(ctx, "POST", "/auth/password/reset", req)
 	if err != nil {
 		return nil, err
 	}
@@ -611,7 +611,7 @@ func (c *Client) ConfirmPasswordReset(ctx context.Context, email, code, newPassw
 		NewPassword: newPassword,
 	}
 
-	httpReq, err := c.newRequest(ctx, "POST", "/auth/confirm-forgot-password", req)
+	httpReq, err := c.newRequest(ctx, "POST", "/auth/password/confirm", req)
 	if err != nil {
 		return err
 	}
@@ -634,7 +634,7 @@ func (c *Client) ConfirmPasswordReset(ctx context.Context, email, code, newPassw
 //       - "not_found" if the user doesn't exist
 //       - "network_error" if the connection fails
 func (c *Client) GetUserProfile(ctx context.Context, accessToken string) (*UserProfileResponse, error) {
-	httpReq, err := c.newRequest(ctx, "GET", "/auth/profile", nil)
+	httpReq, err := c.newRequest(ctx, "GET", "/auth/me", nil)
 	if err != nil {
 		return nil, err
 	}
