@@ -553,4 +553,60 @@ func (c *Client) GetContentDownloadURL(ctx context.Context, contentID string) (*
 	}
 
 	return &resp, nil
+}
+
+// UpdateContentItem updates a content item's metadata.
+//
+// Parameters:
+//   - ctx: Context for the API request
+//   - id: The unique identifier of the content item to update (required)
+//   - req: UpdateContentItemRequest containing the fields to update (required)
+//
+// Returns:
+//   - *ContentItem: The updated content item if successful
+//   - error: An error if the operation fails, which can be:
+//     * apierror.ErrorResponse with codes like:
+//       - "not_found" if the content item doesn't exist
+//       - "bad_request" if the request is invalid
+//       - "unauthorized" if authentication fails
+//       - "forbidden" if the caller lacks permissions
+//       - "network_error" if the connection fails
+func (c *Client) UpdateContentItem(ctx context.Context, id string, req *UpdateContentItemRequest) (*ContentItem, error) {
+	path := fmt.Sprintf("/content/%s", id)
+	httpReq, err := c.newRequest(ctx, "PATCH", path, req)
+	if err != nil {
+		return nil, err
+	}
+
+	var resp ContentItem
+	_, err = c.do(httpReq, &resp)
+	if err != nil {
+		return nil, err
+	}
+
+	return &resp, nil
+}
+
+// DeleteContentItem deletes a content item by its ID.
+//
+// Parameters:
+//   - ctx: Context for the API request
+//   - id: The unique identifier of the content item to delete (required)
+//
+// Returns:
+//   - error: An error if the operation fails, which can be:
+//     * apierror.ErrorResponse with codes like:
+//       - "not_found" if the content item doesn't exist
+//       - "unauthorized" if authentication fails
+//       - "forbidden" if the caller lacks permissions
+//       - "network_error" if the connection fails
+func (c *Client) DeleteContentItem(ctx context.Context, id string) error {
+	path := fmt.Sprintf("/content/%s", id)
+	httpReq, err := c.newRequest(ctx, "DELETE", path, nil)
+	if err != nil {
+		return err
+	}
+
+	_, err = c.do(httpReq, nil)
+	return err
 } 

@@ -2022,4 +2022,203 @@ func TestClient_UploadToURL_Errors(t *testing.T) {
 	if err == nil {
 		t.Fatal("Expected error with problematic reader but got nil")
 	}
+}
+
+func TestClient_UpdateContentItem(t *testing.T) {
+	sourceURI := "https://example.com/updated"
+	expectedResponse := `{
+		"id": "test-id",
+		"tenantId": "tenant-123",
+		"userId": "user-456",
+		"sourceType": "URL",
+		"sourceUri": "https://example.com/updated",
+		"status": "COMPLETED",
+		"metadata": {"key1":"value1","key2":"value2"},
+		"createdAt": "2023-04-01T12:34:56Z",
+		"updatedAt": "2023-04-02T12:34:56Z"
+	}`
+	
+	server := setupTestServer(t, http.StatusOK, expectedResponse, func(r *http.Request) {
+		// Validate request
+		if r.Method != "PATCH" {
+			t.Errorf("Expected PATCH request, got %s", r.Method)
+		}
+		
+		expectedPath := "/content/test-id"
+		if r.URL.Path != expectedPath {
+			t.Errorf("Expected path %s, got %s", expectedPath, r.URL.Path)
+		}
+		
+		if r.Header.Get("Content-Type") != "application/json" {
+			t.Errorf("Expected Content-Type: application/json, got %s", r.Header.Get("Content-Type"))
+		}
+		
+		if r.Header.Get("Authorization") != "Bearer test-token" {
+			t.Errorf("Expected Authorization: Bearer test-token, got %s", r.Header.Get("Authorization"))
+		}
+		
+		// Validate request body
+		var reqBody UpdateContentItemRequest
+		err := json.NewDecoder(r.Body).Decode(&reqBody)
+		if err != nil {
+			t.Fatalf("Failed to decode request body: %v", err)
+		}
+		
+		if reqBody.SourceURI == nil {
+			t.Errorf("Expected SourceURI to be non-nil")
+		} else if *reqBody.SourceURI != sourceURI {
+			t.Errorf("Expected SourceURI: %s, got %s", sourceURI, *reqBody.SourceURI)
+		}
+		
+		if len(reqBody.Metadata) != 2 {
+			t.Errorf("Expected 2 metadata entries, got %d", len(reqBody.Metadata))
+		}
+		if v, ok := reqBody.Metadata["key1"]; !ok || v != "value1" {
+			t.Errorf("Expected metadata to contain key1:value1")
+		}
+		if v, ok := reqBody.Metadata["key2"]; !ok || v != "value2" {
+			t.Errorf("Expected metadata to contain key2:value2")
+		}
+	})
+	defer server.Close()
+	
+	client, err := NewClientWithOptions(
+		server.URL,
+		WithTokenProvider(&MockTokenProvider{token: "test-token"}),
+	)
+	if err != nil {
+		t.Fatalf("Failed to create client: %v", err)
+	}
+	
+	// Create update request
+	metadata := map[string]string{
+		"key1": "value1",
+		"key2": "value2",
+	}
+	updateReq := &UpdateContentItemRequest{
+		SourceURI: &sourceURI,
+		Metadata:  metadata,
+	}
+	
+	// Perform update
+	resp, err := client.UpdateContentItem(context.Background(), "test-id", updateReq)
+	if err != nil {
+		t.Fatalf("UpdateContentItem returned unexpected error: %v", err)
+	}
+	
+	// Validate response
+	if resp.ID != "test-id" {
+		t.Errorf("UpdateContentItem response ID = %q, want %q", resp.ID, "test-id")
+	}
+	if resp.SourceURI != sourceURI {
+		t.Errorf("UpdateContentItem response SourceURI = %q, want %q", resp.SourceURI, sourceURI)
+	}
+	if resp.TenantID != "tenant-123" {
+		t.Errorf("UpdateContentItem response TenantID = %q, want %q", resp.TenantID, "tenant-123")
+	}
+	if resp.UserID != "user-456" {
+		t.Errorf("UpdateContentItem response UserID = %q, want %q", resp.UserID, "user-456")
+	}
+	if resp.Status != "COMPLETED" {
+		t.Errorf("UpdateContentItem response Status = %q, want %q", resp.Status, "COMPLETED")
+	}
+	if resp.CreatedAt != "2023-04-01T12:34:56Z" {
+		t.Errorf("UpdateContentItem response CreatedAt = %q, want %q", resp.CreatedAt, "2023-04-01T12:34:56Z")
+	}
+	if resp.UpdatedAt != "2023-04-02T12:34:56Z" {
+		t.Errorf("UpdateContentItem response UpdatedAt = %q, want %q", resp.UpdatedAt, "2023-04-02T12:34:56Z")
+	}
+	if len(resp.Metadata) != 2 {
+		t.Errorf("Expected 2 metadata entries in response, got %d", len(resp.Metadata))
+	}
+}
+
+func TestClient_UpdateContentItem_Error(t *testing.T) {
+	errorResponse := `{"error":"not_found","error_description":"Content item not found"}`
+	
+	server := setupTestServer(t, http.StatusNotFound, errorResponse, nil)
+	defer server.Close()
+	
+	client, err := NewClient(server.URL)
+	if err != nil {
+		t.Fatalf("Failed to create client: %v", err)
+	}
+	
+	sourceURI := "https://example.com/updated"
+	updateReq := &UpdateContentItemRequest{
+		SourceURI: &sourceURI,
+	}
+	
+	_, err = client.UpdateContentItem(context.Background(), "non-existent-id", updateReq)
+	if err == nil {
+		t.Fatalf("Expected error for non-existent content item, got nil")
+	}
+	
+	var apiErr *apierror.ErrorResponse
+	if !errors.As(err, &apiErr) {
+		t.Fatalf("Expected apierror.ErrorResponse, got %T: %v", err, err)
+	}
+	
+	if apiErr.ErrorCode != "not_found" {
+		t.Errorf("Expected error code not_found, got %s", apiErr.ErrorCode)
+	}
+}
+
+func TestClient_DeleteContentItem(t *testing.T) {
+	server := setupTestServer(t, http.StatusNoContent, "", func(r *http.Request) {
+		// Validate request
+		if r.Method != "DELETE" {
+			t.Errorf("Expected DELETE request, got %s", r.Method)
+		}
+		
+		expectedPath := "/content/test-id"
+		if r.URL.Path != expectedPath {
+			t.Errorf("Expected path %s, got %s", expectedPath, r.URL.Path)
+		}
+		
+		if r.Header.Get("Authorization") != "Bearer test-token" {
+			t.Errorf("Expected Authorization: Bearer test-token, got %s", r.Header.Get("Authorization"))
+		}
+	})
+	defer server.Close()
+	
+	client, err := NewClientWithOptions(
+		server.URL,
+		WithTokenProvider(&MockTokenProvider{token: "test-token"}),
+	)
+	if err != nil {
+		t.Fatalf("Failed to create client: %v", err)
+	}
+	
+	// Perform delete
+	err = client.DeleteContentItem(context.Background(), "test-id")
+	if err != nil {
+		t.Fatalf("DeleteContentItem returned unexpected error: %v", err)
+	}
+}
+
+func TestClient_DeleteContentItem_Error(t *testing.T) {
+	errorResponse := `{"error":"not_found","error_description":"Content item not found"}`
+	
+	server := setupTestServer(t, http.StatusNotFound, errorResponse, nil)
+	defer server.Close()
+	
+	client, err := NewClient(server.URL)
+	if err != nil {
+		t.Fatalf("Failed to create client: %v", err)
+	}
+	
+	err = client.DeleteContentItem(context.Background(), "non-existent-id")
+	if err == nil {
+		t.Fatalf("Expected error for non-existent content item, got nil")
+	}
+	
+	var apiErr *apierror.ErrorResponse
+	if !errors.As(err, &apiErr) {
+		t.Fatalf("Expected apierror.ErrorResponse, got %T: %v", err, err)
+	}
+	
+	if apiErr.ErrorCode != "not_found" {
+		t.Errorf("Expected error code not_found, got %s", apiErr.ErrorCode)
+	}
 } 

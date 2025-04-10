@@ -178,4 +178,14 @@ type IngestURLResponse struct {
 type DownloadURLResponse struct {
 	// DownloadURL is the pre-signed URL that can be used to download the content
 	DownloadURL string `json:"downloadUrl"`
+}
+
+// UpdateContentItemRequest represents the payload for updating a content item.
+// It uses pointers for fields that are optional in the update to distinguish
+// between empty values and fields not provided for update.
+type UpdateContentItemRequest struct {
+	// SourceURI is the original source URI for the content
+	SourceURI *string `json:"sourceUri,omitempty"`
+	// Metadata is an optional map of key-value pairs with additional information about the content
+	Metadata map[string]string `json:"metadata,omitempty"`
 } 
