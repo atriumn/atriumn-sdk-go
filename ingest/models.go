@@ -171,4 +171,11 @@ type IngestURLResponse struct {
 	ID string `json:"id"`
 	// Status should be PENDING/QUEUED, indicating asynchronous processing
 	Status string `json:"status"`
+}
+
+// DownloadURLResponse represents the response from the GET /content/{id}/download-url endpoint.
+// It contains a pre-signed URL that can be used to download the content.
+type DownloadURLResponse struct {
+	// DownloadURL is the pre-signed URL that can be used to download the content
+	DownloadURL string `json:"downloadUrl"`
 } 

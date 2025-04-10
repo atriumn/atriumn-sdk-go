@@ -522,4 +522,35 @@ func (c *Client) ListContentItems(ctx context.Context, statusFilter *string, sou
 	}
 
 	return &resp, nil
+}
+
+// GetContentDownloadURL retrieves a pre-signed URL that can be used to download the content.
+//
+// Parameters:
+//   - ctx: Context for the API request
+//   - contentID: The unique identifier of the content item (required)
+//
+// Returns:
+//   - *DownloadURLResponse: Contains the pre-signed download URL if successful
+//   - error: An error if the operation fails, which can be:
+//     * apierror.ErrorResponse with codes like:
+//       - "not_found" if the content doesn't exist
+//       - "unauthorized" if authentication fails
+//       - "forbidden" if the caller lacks permissions
+//       - "network_error" if the connection fails
+func (c *Client) GetContentDownloadURL(ctx context.Context, contentID string) (*DownloadURLResponse, error) {
+	path := fmt.Sprintf("/content/%s/download-url", contentID)
+	
+	req, err := c.newRequest(ctx, "GET", path, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var resp DownloadURLResponse
+	_, err = c.do(req, &resp)
+	if err != nil {
+		return nil, err
+	}
+
+	return &resp, nil
 } 

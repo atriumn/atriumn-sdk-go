@@ -588,6 +588,70 @@ func TestClient_GetContentItem_NotFound(t *testing.T) {
 	}
 }
 
+func TestClient_GetContentDownloadURL(t *testing.T) {
+	expectedResponse := `{"downloadUrl":"https://example.com/download-signed-url"}`
+	
+	server := setupTestServer(t, http.StatusOK, expectedResponse, func(r *http.Request) {
+		// Validate request
+		if r.Method != "GET" {
+			t.Errorf("Expected GET request, got %s", r.Method)
+		}
+		
+		expectedPath := "/content/test-content-id/download-url"
+		if r.URL.Path != expectedPath {
+			t.Errorf("Expected path %s, got %s", expectedPath, r.URL.Path)
+		}
+	})
+	defer server.Close()
+	
+	client, err := NewClient(server.URL)
+	if err != nil {
+		t.Fatalf("Failed to create client: %v", err)
+	}
+	
+	resp, err := client.GetContentDownloadURL(context.Background(), "test-content-id")
+	if err != nil {
+		t.Fatalf("GetContentDownloadURL returned unexpected error: %v", err)
+	}
+	
+	expectedURL := "https://example.com/download-signed-url"
+	if resp.DownloadURL != expectedURL {
+		t.Errorf("GetContentDownloadURL response DownloadURL = %q, want %q", resp.DownloadURL, expectedURL)
+	}
+}
+
+func TestClient_GetContentDownloadURL_Error(t *testing.T) {
+	errorResponse := `{"error":"not_found","error_description":"Content with ID 'non-existent-id' not found"}`
+	
+	server := setupTestServer(t, http.StatusNotFound, errorResponse, nil)
+	defer server.Close()
+	
+	client, err := NewClient(server.URL)
+	if err != nil {
+		t.Fatalf("Failed to create client: %v", err)
+	}
+	
+	resp, err := client.GetContentDownloadURL(context.Background(), "non-existent-id")
+	if err == nil {
+		t.Fatalf("Expected error, got nil")
+	}
+	if resp != nil {
+		t.Errorf("Expected nil response, got %+v", resp)
+	}
+	
+	// Verify error type and message
+	apiErr, ok := err.(*apierror.ErrorResponse)
+	if !ok {
+		t.Fatalf("Expected *apierror.ErrorResponse, got %T", err)
+	}
+	if apiErr.ErrorCode != "not_found" {
+		t.Errorf("Expected error code 'not_found', got %q", apiErr.ErrorCode)
+	}
+	if apiErr.Description != "Content with ID 'non-existent-id' not found" {
+		t.Errorf("Expected error description about content not found, got %q", apiErr.Description)
+	}
+}
+
 func TestClient_ListContentItems(t *testing.T) {
 	expectedResponse := `{
 		"items": [
