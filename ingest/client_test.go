@@ -2221,4 +2221,156 @@ func TestClient_DeleteContentItem_Error(t *testing.T) {
 	if apiErr.ErrorCode != "not_found" {
 		t.Errorf("Expected error code not_found, got %s", apiErr.ErrorCode)
 	}
+}
+
+func TestClient_GetTextContent(t *testing.T) {
+	expectedResponse := `{"content":"This is the text content of the document."}`
+	
+	server := setupTestServer(t, http.StatusOK, expectedResponse, func(r *http.Request) {
+		// Validate request
+		if r.Method != "GET" {
+			t.Errorf("Expected GET request, got %s", r.Method)
+		}
+		
+		expectedPath := "/content/text-content-id/text"
+		if r.URL.Path != expectedPath {
+			t.Errorf("Expected path %s, got %s", expectedPath, r.URL.Path)
+		}
+		
+		if r.Header.Get("Authorization") != "Bearer test-token" {
+			t.Errorf("Expected Authorization: Bearer test-token, got %s", r.Header.Get("Authorization"))
+		}
+	})
+	defer server.Close()
+	
+	client, err := NewClientWithOptions(
+		server.URL,
+		WithTokenProvider(&MockTokenProvider{token: "test-token"}),
+	)
+	if err != nil {
+		t.Fatalf("Failed to create client: %v", err)
+	}
+	
+	resp, err := client.GetTextContent(context.Background(), "text-content-id")
+	if err != nil {
+		t.Fatalf("GetTextContent returned unexpected error: %v", err)
+	}
+	
+	expectedContent := "This is the text content of the document."
+	if resp.Content != expectedContent {
+		t.Errorf("GetTextContent response Content = %q, want %q", resp.Content, expectedContent)
+	}
+}
+
+func TestClient_GetTextContent_NotFound(t *testing.T) {
+	errorResponse := `{"error":"not_found","error_description":"Content item not found"}`
+	
+	server := setupTestServer(t, http.StatusNotFound, errorResponse, nil)
+	defer server.Close()
+	
+	client, err := NewClient(server.URL)
+	if err != nil {
+		t.Fatalf("Failed to create client: %v", err)
+	}
+	
+	// Request nonexistent content text
+	resp, err := client.GetTextContent(context.Background(), "nonexistent-id")
+	if err == nil {
+		t.Fatalf("Expected error, got nil")
+	}
+	if resp != nil {
+		t.Errorf("Expected nil response, got %+v", resp)
+	}
+	
+	// Verify error type
+	apiErr, ok := err.(*apierror.ErrorResponse)
+	if !ok {
+		t.Fatalf("Expected *apierror.ErrorResponse, got %T", err)
+	}
+	if apiErr.ErrorCode != "not_found" {
+		t.Errorf("Expected error code 'not_found', got %q", apiErr.ErrorCode)
+	}
+}
+
+func TestClient_UpdateTextContent(t *testing.T) {
+	server := setupTestServer(t, http.StatusNoContent, "", func(r *http.Request) {
+		// Validate request
+		if r.Method != "PUT" {
+			t.Errorf("Expected PUT request, got %s", r.Method)
+		}
+		
+		expectedPath := "/content/text-content-id/text"
+		if r.URL.Path != expectedPath {
+			t.Errorf("Expected path %s, got %s", expectedPath, r.URL.Path)
+		}
+		
+		// Check content type is application/json
+		contentType := r.Header.Get("Content-Type")
+		if contentType != "application/json" {
+			t.Errorf("Expected Content-Type application/json, got %s", contentType)
+		}
+		
+		// Parse request body
+		var req UpdateTextContentRequest
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Fatalf("Failed to read request body: %v", err)
+		}
+		
+		err = json.Unmarshal(body, &req)
+		if err != nil {
+			t.Fatalf("Failed to unmarshal request body: %v", err)
+		}
+		
+		// Check request fields
+		expectedContent := "This is the updated text content."
+		if req.Content != expectedContent {
+			t.Errorf("Expected Content: %q, got %q", expectedContent, req.Content)
+		}
+	})
+	defer server.Close()
+	
+	client, err := NewClient(server.URL)
+	if err != nil {
+		t.Fatalf("Failed to create client: %v", err)
+	}
+	
+	req := &UpdateTextContentRequest{
+		Content: "This is the updated text content.",
+	}
+	
+	err = client.UpdateTextContent(context.Background(), "text-content-id", req)
+	if err != nil {
+		t.Fatalf("UpdateTextContent returned unexpected error: %v", err)
+	}
+}
+
+func TestClient_UpdateTextContent_BadRequest(t *testing.T) {
+	errorResponse := `{"error":"bad_request","error_description":"Content item is not of type TEXT"}`
+	
+	server := setupTestServer(t, http.StatusBadRequest, errorResponse, nil)
+	defer server.Close()
+	
+	client, err := NewClient(server.URL)
+	if err != nil {
+		t.Fatalf("Failed to create client: %v", err)
+	}
+	
+	req := &UpdateTextContentRequest{
+		Content: "This is the text content.",
+	}
+	
+	err = client.UpdateTextContent(context.Background(), "non-text-content-id", req)
+	if err == nil {
+		t.Fatalf("Expected error for non-text content item, got nil")
+	}
+	
+	var apiErr *apierror.ErrorResponse
+	if !errors.As(err, &apiErr) {
+		t.Fatalf("Expected apierror.ErrorResponse, got %T: %v", err, err)
+	}
+	
+	if apiErr.ErrorCode != "bad_request" {
+		t.Errorf("Expected error code bad_request, got %s", apiErr.ErrorCode)
+	}
 } 

@@ -188,4 +188,18 @@ type UpdateContentItemRequest struct {
 	SourceURI *string `json:"sourceUri,omitempty"`
 	// Metadata is an optional map of key-value pairs with additional information about the content
 	Metadata map[string]string `json:"metadata,omitempty"`
+}
+
+// GetTextContentResponse represents the response from the GET /content/{id}/text endpoint.
+// It contains the raw text content of a TEXT type content item.
+type GetTextContentResponse struct {
+	// Content is the raw text content
+	Content string `json:"content"`
+}
+
+// UpdateTextContentRequest represents the request to update text content via PUT /content/{id}/text.
+// It contains the new text content to be stored.
+type UpdateTextContentRequest struct {
+	// Content is the new text content to store
+	Content string `json:"content"`
 } 

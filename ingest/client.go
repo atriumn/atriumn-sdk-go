@@ -609,4 +609,61 @@ func (c *Client) DeleteContentItem(ctx context.Context, id string) error {
 
 	_, err = c.do(httpReq, nil)
 	return err
+}
+
+// GetTextContent retrieves the raw text content of a TEXT type content item.
+//
+// Parameters:
+//   - ctx: Context for the API request
+//   - id: The unique identifier of the content item to retrieve text from (required)
+//
+// Returns:
+//   - *GetTextContentResponse: Contains the raw text content if successful
+//   - error: An error if the operation fails, which can be:
+//     * apierror.ErrorResponse with codes like:
+//       - "not_found" if the content item doesn't exist
+//       - "bad_request" if the content item is not of type TEXT
+//       - "unauthorized" if authentication fails
+//       - "forbidden" if the caller lacks permissions
+//       - "network_error" if the connection fails
+func (c *Client) GetTextContent(ctx context.Context, id string) (*GetTextContentResponse, error) {
+	path := fmt.Sprintf("/content/%s/text", id)
+	httpReq, err := c.newRequest(ctx, "GET", path, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var resp GetTextContentResponse
+	_, err = c.do(httpReq, &resp)
+	if err != nil {
+		return nil, err
+	}
+
+	return &resp, nil
+}
+
+// UpdateTextContent updates the raw text content of a TEXT type content item.
+//
+// Parameters:
+//   - ctx: Context for the API request
+//   - id: The unique identifier of the content item to update (required)
+//   - req: UpdateTextContentRequest containing the new text content (required)
+//
+// Returns:
+//   - error: An error if the operation fails, which can be:
+//     * apierror.ErrorResponse with codes like:
+//       - "not_found" if the content item doesn't exist
+//       - "bad_request" if the content item is not of type TEXT
+//       - "unauthorized" if authentication fails
+//       - "forbidden" if the caller lacks permissions
+//       - "network_error" if the connection fails
+func (c *Client) UpdateTextContent(ctx context.Context, id string, req *UpdateTextContentRequest) error {
+	path := fmt.Sprintf("/content/%s/text", id)
+	httpReq, err := c.newRequest(ctx, "PUT", path, req)
+	if err != nil {
+		return err
+	}
+
+	_, err = c.do(httpReq, nil)
+	return err
 } 
