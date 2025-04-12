@@ -81,8 +81,8 @@ type RequestFileUploadResponse struct {
 // RequestTextUploadRequest represents a request to initiate a text upload session.
 // It sends metadata to the ingest service to obtain an upload URL, without the content itself.
 type RequestTextUploadRequest struct {
-	// ContentType is the MIME type of the text content (required)
-	ContentType string `json:"contentType"`
+	// ContentType is the MIME type of the text content (optional, defaults to text/plain)
+	ContentType string `json:"contentType,omitempty"`
 	// UserID is an optional identifier for the user who owns this content
 	UserID string `json:"userId,omitempty"`
 	// Metadata is an optional map of key-value pairs with additional information
@@ -100,6 +100,12 @@ type RequestTextUploadResponse struct {
 	Status string `json:"status"`
 	// UploadURL is the pre-signed URL to use for the HTTP PUT upload
 	UploadURL string `json:"uploadUrl"`
+	// TenantID is the tenant ID associated with this upload
+	TenantID string `json:"tenantId,omitempty"`
+	// UserID is the user ID associated with this upload, if provided
+	UserID string `json:"userId,omitempty"`
+	// Timestamp is when the request was processed
+	Timestamp string `json:"timestamp,omitempty"`
 }
 
 // IngestResponse represents the response from the ingest endpoints.
