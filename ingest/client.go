@@ -12,6 +12,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/url"
+	"os"
 	"strconv"
 	"time"
 
@@ -382,10 +383,21 @@ func (c *Client) UploadToURL(ctx context.Context, uploadURL string, contentType 
 	// Set the Content-Type header to the specified value
 	req.Header.Set("Content-Type", contentType)
 
-	// Use the client's HTTP client to send the request directly to S3
-	// Note that we're not using c.do() here because this is a direct S3 request,
-	// not an API request that needs to be authenticated or processed through the usual pipeline
-	resp, err := c.HTTPClient.Do(req)
+	// Set Content-Length if we can determine it from the fileReader (if it's an *os.File)
+	if file, ok := fileReader.(*os.File); ok {
+		fileInfo, err := file.Stat()
+		if err == nil {
+			req.ContentLength = fileInfo.Size()
+		}
+	}
+
+	// Use the standard HTTP client instead of c.HTTPClient to avoid auth header conflicts
+	// for direct S3 uploads with pre-signed URLs
+	standardClient := &http.Client{
+		Timeout: 60 * time.Second, // Set a reasonable timeout
+	}
+	
+	resp, err := standardClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to upload to URL: %w", err)
 	}
