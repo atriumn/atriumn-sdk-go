@@ -81,6 +81,8 @@ type RequestFileUploadResponse struct {
 // RequestTextUploadRequest represents a request to initiate a text upload session.
 // It sends metadata to the ingest service to obtain an upload URL, without the content itself.
 type RequestTextUploadRequest struct {
+	// TenantID is an optional identifier for multi-tenant applications
+	TenantID string `json:"tenantId,omitempty"`
 	// ContentType is the MIME type of the text content (optional, defaults to text/plain)
 	ContentType string `json:"contentType,omitempty"`
 	// UserID is an optional identifier for the user who owns this content
