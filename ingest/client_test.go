@@ -496,6 +496,7 @@ func TestClient_GetContentItem(t *testing.T) {
 		"sourceType": "url",
 		"sourceUri": "https://example.com/document.pdf",
 		"s3Key": "tenant-123/content-123.pdf",
+		"s3Bucket": "atriumn-content-bucket",
 		"status": "processed",
 		"contentType": "application/pdf",
 		"size": 12345,
@@ -543,6 +544,9 @@ func TestClient_GetContentItem(t *testing.T) {
 	}
 	if contentItem.SourceType != "url" {
 		t.Errorf("GetContentItem response SourceType = %q, want %q", contentItem.SourceType, "url")
+	}
+	if contentItem.S3Bucket != "atriumn-content-bucket" {
+		t.Errorf("GetContentItem response S3Bucket = %q, want %q", contentItem.S3Bucket, "atriumn-content-bucket")
 	}
 	if contentItem.Status != "processed" {
 		t.Errorf("GetContentItem response Status = %q, want %q", contentItem.Status, "processed")
@@ -661,6 +665,8 @@ func TestClient_ListContentItems(t *testing.T) {
 				"userId": "user-456",
 				"sourceType": "url",
 				"sourceUri": "https://example.com/document1.pdf",
+				"s3Key": "tenant-123/content-123.pdf",
+				"s3Bucket": "atriumn-content-bucket",
 				"status": "processed",
 				"contentType": "application/pdf",
 				"size": 12345,
@@ -672,6 +678,8 @@ func TestClient_ListContentItems(t *testing.T) {
 				"tenantId": "tenant-123",
 				"userId": "user-456",
 				"sourceType": "text",
+				"s3Key": "tenant-123/content-456.txt",
+				"s3Bucket": "atriumn-content-bucket-2",
 				"status": "processing",
 				"contentType": "text/plain",
 				"size": 5678,

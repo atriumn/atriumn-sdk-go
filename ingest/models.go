@@ -146,6 +146,8 @@ type ContentItem struct {
 	SourceURI string `json:"sourceUri,omitempty"`
 	// S3Key is the internal storage key in S3
 	S3Key string `json:"s3Key,omitempty"`
+	// S3Bucket is the S3 bucket where the content is stored
+	S3Bucket string `json:"s3Bucket,omitempty"`
 	// Status indicates the processing status of the content
 	Status string `json:"status"`
 	// ContentType is the MIME type of the content
