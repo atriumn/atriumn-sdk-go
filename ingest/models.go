@@ -27,6 +27,8 @@ type IngestURLRequest struct {
 	UserID string `json:"userId,omitempty"`
 	// URL is the web address to scrape and ingest (required)
 	URL string `json:"url"`
+	// SourceSubType is an optional hint about the nature of the URL (e.g., "linkedin_profile")
+	SourceSubType *string `json:"sourceSubType,omitempty"`
 	// Metadata is an optional map of key-value pairs with additional information about the content
 	Metadata map[string]string `json:"metadata,omitempty"`
 }
