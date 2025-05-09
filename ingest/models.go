@@ -31,6 +31,8 @@ type IngestURLRequest struct {
 	SourceSubType *string `json:"sourceSubType,omitempty"`
 	// Metadata is an optional map of key-value pairs with additional information about the content
 	Metadata map[string]string `json:"metadata,omitempty"`
+	// UserNotes is an optional field containing free-form text notes provided by the user
+	UserNotes *string `json:"userNotes,omitempty"`
 }
 
 // IngestFileRequest represents a request to ingest content from a file.
