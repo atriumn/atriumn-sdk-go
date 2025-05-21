@@ -423,81 +423,81 @@ func TestNetworkError(t *testing.T) {
 
 func TestHTTPStatusCodeErrors(t *testing.T) {
 	tests := []struct {
-		name           string
-		statusCode     int
-		responseBody   string
-		expectedError  string
-		expectedCode   string
+		name          string
+		statusCode    int
+		responseBody  string
+		expectedError string
+		expectedCode  string
 	}{
 		{
-			name:           "Bad Request - Empty Body",
-			statusCode:     http.StatusBadRequest,
-			responseBody:   `{}`,
-			expectedError:  "The request was invalid. Please check your input and try again.",
-			expectedCode:   "bad_request",
+			name:          "Bad Request - Empty Body",
+			statusCode:    http.StatusBadRequest,
+			responseBody:  `{}`,
+			expectedError: "The request was invalid. Please check your input and try again.",
+			expectedCode:  "bad_request",
 		},
 		{
-			name:           "Bad Request - Malformed JSON",
-			statusCode:     http.StatusBadRequest,
-			responseBody:   `{malformed]`,
-			expectedError:  "The request was invalid. Please check your input and try again.",
-			expectedCode:   "bad_request",
+			name:          "Bad Request - Malformed JSON",
+			statusCode:    http.StatusBadRequest,
+			responseBody:  `{malformed]`,
+			expectedError: "The request was invalid. Please check your input and try again.",
+			expectedCode:  "bad_request",
 		},
 		{
-			name:           "Unauthorized - Empty Body",
-			statusCode:     http.StatusUnauthorized,
-			responseBody:   `{}`,
-			expectedError:  "Authentication failed. Please check your credentials or login again.",
-			expectedCode:   "unauthorized",
+			name:          "Unauthorized - Empty Body",
+			statusCode:    http.StatusUnauthorized,
+			responseBody:  `{}`,
+			expectedError: "Authentication failed. Please check your credentials or login again.",
+			expectedCode:  "unauthorized",
 		},
 		{
-			name:           "Forbidden - Empty Body",
-			statusCode:     http.StatusForbidden,
-			responseBody:   `{}`,
-			expectedError:  "You don't have permission to access this resource.",
-			expectedCode:   "forbidden",
+			name:          "Forbidden - Empty Body",
+			statusCode:    http.StatusForbidden,
+			responseBody:  `{}`,
+			expectedError: "You don't have permission to access this resource.",
+			expectedCode:  "forbidden",
 		},
 		{
-			name:           "Not Found - Empty Body",
-			statusCode:     http.StatusNotFound,
-			responseBody:   `{}`,
-			expectedError:  "The requested resource was not found.",
-			expectedCode:   "not_found",
+			name:          "Not Found - Empty Body",
+			statusCode:    http.StatusNotFound,
+			responseBody:  `{}`,
+			expectedError: "The requested resource was not found.",
+			expectedCode:  "not_found",
 		},
 		{
-			name:           "Rate Limited - Empty Body",
-			statusCode:     http.StatusTooManyRequests,
-			responseBody:   `{}`,
-			expectedError:  "Too many requests. Please try again later.",
-			expectedCode:   "rate_limited",
+			name:          "Rate Limited - Empty Body",
+			statusCode:    http.StatusTooManyRequests,
+			responseBody:  `{}`,
+			expectedError: "Too many requests. Please try again later.",
+			expectedCode:  "rate_limited",
 		},
 		{
-			name:           "Server Error - Empty Body",
-			statusCode:     http.StatusInternalServerError,
-			responseBody:   `{}`,
-			expectedError:  "The service is currently unavailable. Please try again later.",
-			expectedCode:   "server_error",
+			name:          "Server Error - Empty Body",
+			statusCode:    http.StatusInternalServerError,
+			responseBody:  `{}`,
+			expectedError: "The service is currently unavailable. Please try again later.",
+			expectedCode:  "server_error",
 		},
 		{
-			name:           "Server Error - Malformed JSON",
-			statusCode:     http.StatusInternalServerError,
-			responseBody:   `{malformed]`,
-			expectedError:  "The service is currently unavailable. Please try again later.",
-			expectedCode:   "server_error",
+			name:          "Server Error - Malformed JSON",
+			statusCode:    http.StatusInternalServerError,
+			responseBody:  `{malformed]`,
+			expectedError: "The service is currently unavailable. Please try again later.",
+			expectedCode:  "server_error",
 		},
 		{
-			name:           "Server Error - With Error Message",
-			statusCode:     http.StatusInternalServerError,
-			responseBody:   `{"error":"database_error","error_description":"Failed to connect to database"}`,
-			expectedError:  "Failed to connect to database",
-			expectedCode:   "database_error",
+			name:          "Server Error - With Error Message",
+			statusCode:    http.StatusInternalServerError,
+			responseBody:  `{"error":"database_error","error_description":"Failed to connect to database"}`,
+			expectedError: "Failed to connect to database",
+			expectedCode:  "database_error",
 		},
 		{
-			name:           "Teapot - Unknown Status",
-			statusCode:     http.StatusTeapot,
-			responseBody:   `{}`,
-			expectedError:  "Unexpected HTTP status: 418",
-			expectedCode:   "unknown_error",
+			name:          "Teapot - Unknown Status",
+			statusCode:    http.StatusTeapot,
+			responseBody:  `{}`,
+			expectedError: "Unexpected HTTP status: 418",
+			expectedCode:  "unknown_error",
 		},
 	}
 
@@ -505,7 +505,7 @@ func TestHTTPStatusCodeErrors(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(tt.statusCode)
-				w.Write([]byte(tt.responseBody))
+				_, _ = w.Write([]byte(tt.responseBody))
 			}))
 			defer server.Close()
 
@@ -517,12 +517,12 @@ func TestHTTPStatusCodeErrors(t *testing.T) {
 			})
 
 			require.Error(t, err)
-			
+
 			apiErr, ok := err.(*apierror.ErrorResponse)
 			require.True(t, ok, "Error should be of type *apierror.ErrorResponse")
-			
+
 			assert.Equal(t, tt.expectedCode, apiErr.ErrorCode)
-			
+
 			// For Teapot case, just check if the status code is in the description
 			if tt.statusCode == http.StatusTeapot {
 				assert.Contains(t, apiErr.Description, "418")
@@ -554,7 +554,7 @@ func TestTokenProviderScenarios(t *testing.T) {
 			tokenProvider: &mockTokenProvider{
 				token: "",
 			},
-			expectedError: "",  // Should not error, just send request without token
+			expectedError: "", // Should not error, just send request without token
 		},
 		{
 			name: "Token Provider Returns Valid Token",
@@ -576,7 +576,7 @@ func TestTokenProviderScenarios(t *testing.T) {
 						assert.Empty(t, r.Header.Get("Authorization"))
 					}
 				}
-				
+
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusOK)
 				_, _ = fmt.Fprintln(w, `{
@@ -589,7 +589,7 @@ func TestTokenProviderScenarios(t *testing.T) {
 			client.tokenProvider = tt.tokenProvider
 
 			_, err := client.GenerateUploadURL(context.Background(), &GenerateUploadURLRequest{
-				Filename: "test.txt",
+				Filename:    "test.txt",
 				ContentType: "text/plain",
 			})
 
@@ -612,7 +612,7 @@ func TestRequestValidation(t *testing.T) {
 		{
 			name: "Upload URL - Empty Filename",
 			request: &GenerateUploadURLRequest{
-				Filename: "",
+				Filename:    "",
 				ContentType: "text/plain",
 			},
 			expectedError: "filename is required",
@@ -620,7 +620,7 @@ func TestRequestValidation(t *testing.T) {
 		{
 			name: "Upload URL - Empty Content Type",
 			request: &GenerateUploadURLRequest{
-				Filename: "test.txt",
+				Filename:    "test.txt",
 				ContentType: "",
 			},
 			expectedError: "content type is required",
@@ -668,7 +668,7 @@ func TestNetworkTimeoutError(t *testing.T) {
 	client.HTTPClient.Timeout = 1 * time.Millisecond
 
 	_, err = client.GenerateUploadURL(context.Background(), &GenerateUploadURLRequest{
-		Filename: "test.txt",
+		Filename:    "test.txt",
 		ContentType: "text/plain",
 	})
 

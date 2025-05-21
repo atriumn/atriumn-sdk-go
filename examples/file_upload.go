@@ -31,7 +31,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to open file: %v", err)
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			log.Printf("Warning: Failed to close file: %v", err)
+		}
+	}()
 
 	// Get file information
 	fileInfo, err := file.Stat()
@@ -77,7 +81,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to upload file: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			log.Printf("Warning: Failed to close response body: %v", err)
+		}
+	}()
 
 	fmt.Printf("Upload complete! Status: %d\n", resp.StatusCode)
 	fmt.Printf("Content item ID: %s\n", uploadResponse.ContentID)
@@ -107,4 +115,4 @@ func getContentType(filename string) string {
 		// Default to binary data if we can't determine the type
 		return "application/octet-stream"
 	}
-} 
+}

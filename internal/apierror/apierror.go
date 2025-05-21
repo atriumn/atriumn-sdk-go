@@ -18,4 +18,4 @@ func (e *ErrorResponse) Error() string {
 		return fmt.Sprintf("%s: %s", e.ErrorCode, e.Description)
 	}
 	return e.ErrorCode
-} 
+}

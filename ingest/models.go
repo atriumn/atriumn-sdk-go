@@ -216,4 +216,4 @@ type GetTextContentResponse struct {
 type UpdateTextContentRequest struct {
 	// Content is the new text content to store
 	Content string `json:"content"`
-} 
+}
