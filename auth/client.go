@@ -125,11 +125,11 @@ func NewClientWithOptions(baseURL string, options ...ClientOption) (*Client, err
 // Returns:
 //   - *ClientCredentialCreateResponse: The created credential including the client ID and secret
 //   - error: An error if the creation fails, which can be:
-//     * apierror.ErrorResponse with codes like:
-//       - "bad_request" if the request is invalid
-//       - "unauthorized" if authentication fails
-//       - "forbidden" if the caller lacks permissions
-//       - "network_error" if the connection fails
+//   - apierror.ErrorResponse with codes like:
+//   - "bad_request" if the request is invalid
+//   - "unauthorized" if authentication fails
+//   - "forbidden" if the caller lacks permissions
+//   - "network_error" if the connection fails
 func (c *Client) CreateClientCredential(ctx context.Context, req ClientCredentialCreateRequest) (*ClientCredentialCreateResponse, error) {
 	httpReq, err := c.newRequest(ctx, "POST", "/admin/credentials", req)
 	if err != nil {
@@ -162,11 +162,11 @@ func (c *Client) CreateClientCredential(ctx context.Context, req ClientCredentia
 // Returns:
 //   - *ListClientCredentialsResponse: A list of matching credentials
 //   - error: An error if the operation fails, which can be:
-//     * apierror.ErrorResponse with codes like:
-//       - "unauthorized" if authentication fails
-//       - "forbidden" if the caller lacks permissions
-//       - "network_error" if the connection fails
-//       - "server_error" if the API server experiences an error
+//   - apierror.ErrorResponse with codes like:
+//   - "unauthorized" if authentication fails
+//   - "forbidden" if the caller lacks permissions
+//   - "network_error" if the connection fails
+//   - "server_error" if the API server experiences an error
 func (c *Client) ListClientCredentials(ctx context.Context, issuedToFilter, tenantIDFilter, scopeFilter string, activeOnly, inactiveOnly bool) (*ListClientCredentialsResponse, error) {
 	httpReq, err := c.newRequest(ctx, "GET", "/admin/credentials", nil)
 	if err != nil {
@@ -209,11 +209,11 @@ func (c *Client) ListClientCredentials(ctx context.Context, issuedToFilter, tena
 // Returns:
 //   - *ClientCredentialResponse: The credential details (without the secret)
 //   - error: An error if the operation fails, which can be:
-//     * apierror.ErrorResponse with codes like:
-//       - "not_found" if the credential doesn't exist
-//       - "unauthorized" if authentication fails
-//       - "forbidden" if the caller lacks permissions
-//       - "network_error" if the connection fails
+//   - apierror.ErrorResponse with codes like:
+//   - "not_found" if the credential doesn't exist
+//   - "unauthorized" if authentication fails
+//   - "forbidden" if the caller lacks permissions
+//   - "network_error" if the connection fails
 func (c *Client) GetClientCredential(ctx context.Context, id string) (*ClientCredentialResponse, error) {
 	path := fmt.Sprintf("/admin/credentials/%s", id)
 	httpReq, err := c.newRequest(ctx, "GET", path, nil)
@@ -240,12 +240,12 @@ func (c *Client) GetClientCredential(ctx context.Context, id string) (*ClientCre
 // Returns:
 //   - *ClientCredentialResponse: The updated credential details
 //   - error: An error if the operation fails, which can be:
-//     * apierror.ErrorResponse with codes like:
-//       - "not_found" if the credential doesn't exist
-//       - "bad_request" if the request is invalid
-//       - "unauthorized" if authentication fails
-//       - "forbidden" if the caller lacks permissions
-//       - "network_error" if the connection fails
+//   - apierror.ErrorResponse with codes like:
+//   - "not_found" if the credential doesn't exist
+//   - "bad_request" if the request is invalid
+//   - "unauthorized" if authentication fails
+//   - "forbidden" if the caller lacks permissions
+//   - "network_error" if the connection fails
 func (c *Client) UpdateClientCredential(ctx context.Context, id string, req ClientCredentialUpdateRequest) (*ClientCredentialResponse, error) {
 	path := fmt.Sprintf("/admin/credentials/%s", id)
 	httpReq, err := c.newRequest(ctx, "PATCH", path, req)
@@ -270,11 +270,11 @@ func (c *Client) UpdateClientCredential(ctx context.Context, id string, req Clie
 //
 // Returns:
 //   - error: An error if the deletion fails, which can be:
-//     * apierror.ErrorResponse with codes like:
-//       - "not_found" if the credential doesn't exist
-//       - "unauthorized" if authentication fails
-//       - "forbidden" if the caller lacks permissions
-//       - "network_error" if the connection fails
+//   - apierror.ErrorResponse with codes like:
+//   - "not_found" if the credential doesn't exist
+//   - "unauthorized" if authentication fails
+//   - "forbidden" if the caller lacks permissions
+//   - "network_error" if the connection fails
 func (c *Client) DeleteClientCredential(ctx context.Context, id string) error {
 	path := fmt.Sprintf("/admin/credentials/%s", id)
 	httpReq, err := c.newRequest(ctx, "DELETE", path, nil)
@@ -337,9 +337,9 @@ func (c *Client) do(req *http.Request, v interface{}) (*http.Response, error) {
 // Returns:
 //   - *HealthResponse: The service health status, typically containing a "status" field
 //   - error: An error if the operation fails, which can be:
-//     * apierror.ErrorResponse with codes like:
-//       - "network_error" if the connection fails
-//       - "server_error" if the API server experiences an error
+//   - apierror.ErrorResponse with codes like:
+//   - "network_error" if the connection fails
+//   - "server_error" if the API server experiences an error
 func (c *Client) Health(ctx context.Context) (*HealthResponse, error) {
 	req, err := c.newRequest(ctx, "GET", "/health", nil)
 	if err != nil {
@@ -366,11 +366,11 @@ func (c *Client) Health(ctx context.Context) (*HealthResponse, error) {
 // Returns:
 //   - *TokenResponse: The token response containing access_token, token_type, and expires_in
 //   - error: An error if the operation fails, which can be:
-//     * apierror.ErrorResponse with codes like:
-//       - "bad_request" if the credentials are invalid
-//       - "unauthorized" if authentication fails
-//       - "network_error" if the connection fails
-//       - "server_error" if the API server experiences an error
+//   - apierror.ErrorResponse with codes like:
+//   - "bad_request" if the credentials are invalid
+//   - "unauthorized" if authentication fails
+//   - "network_error" if the connection fails
+//   - "server_error" if the API server experiences an error
 func (c *Client) GetClientCredentialsToken(ctx context.Context, clientID, clientSecret, scope string) (*TokenResponse, error) {
 	req := ClientCredentialsRequest{
 		GrantType:    "client_credentials",
@@ -404,11 +404,11 @@ func (c *Client) GetClientCredentialsToken(ctx context.Context, clientID, client
 // Returns:
 //   - *UserSignupResponse: The signup response containing the user ID
 //   - error: An error if the operation fails, which can be:
-//     * apierror.ErrorResponse with codes like:
-//       - "bad_request" if the email or password is invalid
-//       - "conflict" if the user already exists
-//       - "network_error" if the connection fails
-//       - "server_error" if the API server experiences an error
+//   - apierror.ErrorResponse with codes like:
+//   - "bad_request" if the email or password is invalid
+//   - "conflict" if the user already exists
+//   - "network_error" if the connection fails
+//   - "server_error" if the API server experiences an error
 func (c *Client) SignupUser(ctx context.Context, email, password string, attributes map[string]string) (*UserSignupResponse, error) {
 	req := UserSignupRequest{
 		Email:      email,
@@ -439,11 +439,11 @@ func (c *Client) SignupUser(ctx context.Context, email, password string, attribu
 //
 // Returns:
 //   - error: An error if the confirmation fails, which can be:
-//     * apierror.ErrorResponse with codes like:
-//       - "bad_request" if the username or code is invalid
-//       - "not_found" if the user doesn't exist
-//       - "expired_code" if the confirmation code has expired
-//       - "network_error" if the connection fails
+//   - apierror.ErrorResponse with codes like:
+//   - "bad_request" if the username or code is invalid
+//   - "not_found" if the user doesn't exist
+//   - "expired_code" if the confirmation code has expired
+//   - "network_error" if the connection fails
 func (c *Client) ConfirmSignup(ctx context.Context, username, code string) error {
 	req := ConfirmSignupRequest{
 		Username:         username,
@@ -468,11 +468,11 @@ func (c *Client) ConfirmSignup(ctx context.Context, username, code string) error
 // Returns:
 //   - *CodeDeliveryDetails: Information about how the code was delivered
 //   - error: An error if the operation fails, which can be:
-//     * apierror.ErrorResponse with codes like:
-//       - "bad_request" if the username is invalid
-//       - "not_found" if the user doesn't exist
-//       - "rate_limited" if too many codes have been requested
-//       - "network_error" if the connection fails
+//   - apierror.ErrorResponse with codes like:
+//   - "bad_request" if the username is invalid
+//   - "not_found" if the user doesn't exist
+//   - "rate_limited" if too many codes have been requested
+//   - "network_error" if the connection fails
 func (c *Client) ResendConfirmationCode(ctx context.Context, username string) (*CodeDeliveryDetails, error) {
 	req := ResendConfirmationCodeRequest{
 		Username: username,
@@ -504,12 +504,12 @@ func (c *Client) ResendConfirmationCode(ctx context.Context, username string) (*
 // Returns:
 //   - *TokenResponse: The token response containing access_token, id_token, refresh_token
 //   - error: An error if the login fails, which can be:
-//     * apierror.ErrorResponse with codes like:
-//       - "bad_request" if the username or password is invalid
-//       - "unauthorized" if authentication fails
-//       - "not_confirmed" if the user account is not confirmed
-//       - "user_disabled" if the account is disabled
-//       - "network_error" if the connection fails
+//   - apierror.ErrorResponse with codes like:
+//   - "bad_request" if the username or password is invalid
+//   - "unauthorized" if authentication fails
+//   - "not_confirmed" if the user account is not confirmed
+//   - "user_disabled" if the account is disabled
+//   - "network_error" if the connection fails
 func (c *Client) LoginUser(ctx context.Context, username, password string) (*TokenResponse, error) {
 	req := UserLoginRequest{
 		Username: username,
@@ -538,10 +538,10 @@ func (c *Client) LoginUser(ctx context.Context, username, password string) (*Tok
 //
 // Returns:
 //   - error: An error if the logout fails, which can be:
-//     * apierror.ErrorResponse with codes like:
-//       - "bad_request" if the token is invalid
-//       - "unauthorized" if the token is already invalid
-//       - "network_error" if the connection fails
+//   - apierror.ErrorResponse with codes like:
+//   - "bad_request" if the token is invalid
+//   - "unauthorized" if the token is already invalid
+//   - "network_error" if the connection fails
 func (c *Client) LogoutUser(ctx context.Context, accessToken string) error {
 	req := UserLogoutRequest{
 		AccessToken: accessToken,
@@ -565,11 +565,11 @@ func (c *Client) LogoutUser(ctx context.Context, accessToken string) error {
 // Returns:
 //   - *PasswordResetResponse: Information about how the reset code was delivered
 //   - error: An error if the operation fails, which can be:
-//     * apierror.ErrorResponse with codes like:
-//       - "bad_request" if the email is invalid
-//       - "not_found" if the user doesn't exist
-//       - "rate_limited" if too many resets have been requested
-//       - "network_error" if the connection fails
+//   - apierror.ErrorResponse with codes like:
+//   - "bad_request" if the email is invalid
+//   - "not_found" if the user doesn't exist
+//   - "rate_limited" if too many resets have been requested
+//   - "network_error" if the connection fails
 func (c *Client) RequestPasswordReset(ctx context.Context, email string) (*PasswordResetResponse, error) {
 	req := PasswordResetRequest{
 		Email: email,
@@ -599,11 +599,11 @@ func (c *Client) RequestPasswordReset(ctx context.Context, email string) (*Passw
 //
 // Returns:
 //   - error: An error if the confirmation fails, which can be:
-//     * apierror.ErrorResponse with codes like:
-//       - "bad_request" if the email, code, or password is invalid
-//       - "not_found" if the user doesn't exist
-//       - "expired_code" if the reset code has expired
-//       - "network_error" if the connection fails
+//   - apierror.ErrorResponse with codes like:
+//   - "bad_request" if the email, code, or password is invalid
+//   - "not_found" if the user doesn't exist
+//   - "expired_code" if the reset code has expired
+//   - "network_error" if the connection fails
 func (c *Client) ConfirmPasswordReset(ctx context.Context, email, code, newPassword string) error {
 	req := ConfirmPasswordResetRequest{
 		Email:       email,
@@ -629,10 +629,10 @@ func (c *Client) ConfirmPasswordReset(ctx context.Context, email, code, newPassw
 // Returns:
 //   - *UserProfileResponse: The user profile containing username and attributes
 //   - error: An error if the operation fails, which can be:
-//     * apierror.ErrorResponse with codes like:
-//       - "unauthorized" if the token is invalid or expired
-//       - "not_found" if the user doesn't exist
-//       - "network_error" if the connection fails
+//   - apierror.ErrorResponse with codes like:
+//   - "unauthorized" if the token is invalid or expired
+//   - "not_found" if the user doesn't exist
+//   - "network_error" if the connection fails
 func (c *Client) GetUserProfile(ctx context.Context, accessToken string) (*UserProfileResponse, error) {
 	httpReq, err := c.newRequest(ctx, "GET", "/auth/me", nil)
 	if err != nil {

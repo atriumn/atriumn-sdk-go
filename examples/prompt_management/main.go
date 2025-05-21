@@ -67,9 +67,9 @@ func createPromptExample(ctx context.Context, client *ai.Client) {
 		},
 		Variables: []ai.PromptVariable{
 			{
-				Name:         "product_name",
-				Description:  "The name of the product",
-				Required:     true,
+				Name:        "product_name",
+				Description: "The name of the product",
+				Required:    true,
 			},
 			{
 				Name:         "feature",
@@ -127,7 +127,7 @@ func updatePromptExample(ctx context.Context, client *ai.Client, promptID string
 	// Define the fields to update
 	newName := "Enhanced Product Description Generator"
 	newTemplate := "Write a compelling and SEO-friendly description for {{product_name}} that highlights its {{feature}} and appeals to {{target_audience}}. Include at least 3 benefits."
-	
+
 	updateRequest := &ai.UpdatePromptRequest{
 		Name:     &newName,
 		Template: &newTemplate,
@@ -187,4 +187,4 @@ func deletePromptExample(ctx context.Context, client *ai.Client, promptID string
 	}
 
 	fmt.Printf("Successfully deleted prompt with ID: %s\n", promptID)
-} 
+}

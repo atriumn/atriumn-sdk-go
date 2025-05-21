@@ -34,4 +34,4 @@ func TestErrorResponse_Error(t *testing.T) {
 			}
 		})
 	}
-} 
+}
