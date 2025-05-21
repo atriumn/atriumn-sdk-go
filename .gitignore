@@ -27,4 +27,5 @@
 .DS_Store
 Thumbs.db 
 
-repomix-output.txt
+repomix-output.txtoutput.json
+output.txt
