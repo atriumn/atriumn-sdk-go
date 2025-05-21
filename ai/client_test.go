@@ -74,7 +74,7 @@ func TestClient_CreatePrompt(t *testing.T) {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(PromptResponse{Prompt: prompt})
+		_ = json.NewEncoder(w).Encode(PromptResponse{Prompt: prompt})
 	}))
 	defer server.Close()
 
@@ -128,7 +128,7 @@ func TestClient_GetPrompt(t *testing.T) {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(PromptResponse{Prompt: prompt})
+		_ = json.NewEncoder(w).Encode(PromptResponse{Prompt: prompt})
 	}))
 	defer server.Close()
 
@@ -190,7 +190,7 @@ func TestClient_UpdatePrompt(t *testing.T) {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(PromptResponse{Prompt: prompt})
+		_ = json.NewEncoder(w).Encode(PromptResponse{Prompt: prompt})
 	}))
 	defer server.Close()
 
@@ -284,7 +284,7 @@ func TestClient_ListPrompts(t *testing.T) {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(PromptsResponse{
+		_ = json.NewEncoder(w).Encode(PromptsResponse{
 			Prompts:   prompts,
 			NextToken: "next-token-123",
 		})

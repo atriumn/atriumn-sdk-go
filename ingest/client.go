@@ -404,7 +404,12 @@ func (c *Client) UploadToURL(ctx context.Context, uploadURL string, contentType 
 
 	// Check for non-2xx status codes and return appropriate error
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		defer resp.Body.Close()
+		defer func() {
+			if closeErr := resp.Body.Close(); closeErr != nil {
+				// Just log it, we can't do much here
+				fmt.Printf("Warning: failed to close response body: %v\n", closeErr)
+			}
+		}()
 		bodyBytes, readErr := io.ReadAll(resp.Body)
 		if readErr != nil {
 			return nil, fmt.Errorf("upload failed with status %d, and failed to read error response: %w", resp.StatusCode, readErr)

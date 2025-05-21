@@ -34,7 +34,7 @@ func setupTestServer(t *testing.T, statusCode int, responseBody string, validate
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(statusCode)
-		w.Write([]byte(responseBody))
+		_, _ = w.Write([]byte(responseBody))
 	}))
 }
 
@@ -283,7 +283,11 @@ func TestClient_IngestFile(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed to get file from form: %v", err)
 		}
-		defer file.Close()
+		defer func() {
+			if err := file.Close(); err != nil {
+				t.Logf("Warning: failed to close file: %v", err)
+			}
+		}()
 
 		if header.Filename != "test.txt" {
 			t.Errorf("Expected filename: test.txt, got %s", header.Filename)
@@ -1148,7 +1152,7 @@ func (t *errorBodyTransport) RoundTrip(req *http.Request) (*http.Response, error
 func TestClient_DoResponseBodyReadError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"status":"ok"}`))
+		_, _ = w.Write([]byte(`{"status":"ok"}`))
 	}))
 	defer server.Close()
 
@@ -1184,7 +1188,7 @@ func TestClient_DoResponseBodyReadError(t *testing.T) {
 func TestClient_DoJSONUnmarshalError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"invalid json`))
+		_, _ = w.Write([]byte(`{"invalid json`))
 	}))
 	defer server.Close()
 
@@ -1487,7 +1491,7 @@ func TestIngestFileURLConstruction(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Return a simple valid response
 		w.Header().Set("Content-Type", "application/json")
-		fmt.Fprintln(w, `{"id":"test-id","status":"processing"}`)
+		_, _ = fmt.Fprintln(w, `{"id":"test-id","status":"processing"}`)
 	}))
 	defer ts.Close()
 
@@ -1969,14 +1973,16 @@ func TestClient_UploadToURL(t *testing.T) {
 	}
 
 	// Cleanup
-	resp.Body.Close()
+	if err := resp.Body.Close(); err != nil {
+		t.Logf("Warning: failed to close response body: %v", err)
+	}
 }
 
 func TestClient_UploadToURL_Errors(t *testing.T) {
 	// Test with server that returns an error
 	errorServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusForbidden)
-		w.Write([]byte("Access denied"))
+		_, _ = w.Write([]byte("Access denied"))
 	}))
 	defer errorServer.Close()
 
