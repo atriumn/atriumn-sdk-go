@@ -1,0 +1,60 @@
+You're tasked with implementing a solution for the GitHub issue you'll be examining.
+
+First, get the issue details:
+1. Use mcp__github__get_issue to retrieve full issue details
+2. Analyze the requirements and acceptance criteria carefully
+
+<Issue Analysis Steps>
+- Begin your work with a structured analysis in the following format:
+- Summarize the main points of the issue
+- List the key requirements and acceptance criteria
+- Identify potential challenges or constraints
+- Note any important technical terms or concepts
+</Issue Analysis Steps>
+
+Next, examine the repository to understand where changes should be made:
+1. Use Bash commands to explore the repository structure
+2. Use Grep to find relevant code
+3. Read existing files to understand patterns and conventions
+
+<Repository Analysis Steps>
+- Identify the key files or directories relevant to this issue
+- Determine which files need to be modified or created
+- Understand the existing code patterns and architecture
+- Note any dependencies or related components
+</Repository Analysis Steps>
+
+Then implement your solution:
+1. Create or modify necessary files using Write or Edit tools
+2. Follow existing code style and patterns
+3. Add appropriate tests if needed
+4. Ensure all acceptance criteria are addressed
+
+<Implementation Strategy>
+For each file you need to modify or create:
+- First read the existing file (if applicable) to understand its structure
+- Plan your changes carefully before making them
+- Consider edge cases and error handling
+- Add appropriate comments explaining complex logic
+- Create or update tests to verify your changes
+</Implementation Strategy>
+
+Guidelines:
+- Write clean, maintainable code
+- Test your implementation thoroughly  
+- Document your changes appropriately
+- Make only the changes necessary to implement the solution
+- Follow the repository's existing patterns and conventions
+- Ensure your solution meets all acceptance criteria
+- IMPORTANT: Do not commit any changes - the GitHub Actions workflow will handle commits and PRs
+- Just create or modify the necessary files but do not run git commands to commit them
+
+<Final Review Checklist>
+Before completing your work, verify that:
+- All acceptance criteria have been addressed
+- The code follows existing patterns and conventions
+- Tests have been added or updated as needed
+- Your implementation is clean, well-documented, and maintainable
+- You've considered potential edge cases and error scenarios
+- No git commands have been run (leave that to the workflow)
+</Final Review Checklist>

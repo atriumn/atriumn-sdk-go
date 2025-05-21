@@ -1,4 +1,6 @@
 // Package storage provides a Go client for interacting with the Atriumn Storage API.
+// It enables generating pre-signed URLs for uploading and downloading files
+// through a simple, idiomatic Go interface.
 package storage
 
 import (
@@ -10,6 +12,8 @@ import (
 	"net/http"
 	"net/url"
 	"time"
+
+	"github.com/atriumn/atriumn-sdk-go/internal/clientutil"
 )
 
 const (
@@ -21,11 +25,14 @@ const (
 )
 
 // TokenProvider defines an interface for retrieving authentication tokens.
+// Implementations should retrieve and return valid bearer tokens for the Atriumn API.
 type TokenProvider interface {
 	GetToken(ctx context.Context) (string, error) // Returns the Bearer token string
 }
 
-// Client is the main API client for Atriumn Storage Service
+// Client is the main API client for Atriumn Storage Service.
+// It handles communication with the API endpoints for generating
+// pre-signed URLs for file uploads and downloads.
 type Client struct {
 	// BaseURL is the base URL of the Atriumn Storage API
 	BaseURL *url.URL
@@ -40,7 +47,15 @@ type Client struct {
 	tokenProvider TokenProvider
 }
 
-// NewClient creates a new Atriumn Storage API client
+// NewClient creates a new Atriumn Storage API client with the specified base URL.
+// It returns an error if the provided URL cannot be parsed.
+//
+// Parameters:
+//   - baseURL: The base URL for the Atriumn Storage API (required)
+//
+// Returns:
+//   - *Client: A configured Storage client instance
+//   - error: An error if the URL cannot be parsed
 func NewClient(baseURL string) (*Client, error) {
 	parsedURL, err := url.Parse(baseURL)
 	if err != nil {
@@ -54,31 +69,63 @@ func NewClient(baseURL string) (*Client, error) {
 	}, nil
 }
 
-// ClientOption is a function that configures a Client
+// ClientOption is a function that configures a Client.
+// It is used with NewClientWithOptions to customize the client behavior.
 type ClientOption func(*Client)
 
-// WithHTTPClient sets the HTTP client for the API client
+// WithHTTPClient sets the HTTP client for the API client.
+// This can be used to customize timeouts, transport settings, or to inject
+// middleware/interceptors for testing or monitoring.
+//
+// Parameters:
+//   - httpClient: The custom HTTP client to use for making API requests
+//
+// Returns:
+//   - ClientOption: A functional option to configure the client
 func WithHTTPClient(httpClient *http.Client) ClientOption {
 	return func(c *Client) {
 		c.HTTPClient = httpClient
 	}
 }
 
-// WithUserAgent sets the user agent for the API client
+// WithUserAgent sets the user agent for the API client.
+// This string is sent with each request to identify the client.
+//
+// Parameters:
+//   - userAgent: The user agent string to send with API requests
+//
+// Returns:
+//   - ClientOption: A functional option to configure the client
 func WithUserAgent(userAgent string) ClientOption {
 	return func(c *Client) {
 		c.UserAgent = userAgent
 	}
 }
 
-// WithTokenProvider sets the token provider for the API client
+// WithTokenProvider sets the token provider for the API client.
+// The token provider is used to obtain authentication tokens for API requests.
+//
+// Parameters:
+//   - tp: The TokenProvider implementation to use for authentication
+//
+// Returns:
+//   - ClientOption: A functional option to configure the client
 func WithTokenProvider(tp TokenProvider) ClientOption {
 	return func(c *Client) {
 		c.tokenProvider = tp
 	}
 }
 
-// NewClientWithOptions creates a new client with custom options
+// NewClientWithOptions creates a new client with custom options.
+// It allows for flexible configuration of the client through functional options.
+//
+// Parameters:
+//   - baseURL: The base URL for the Atriumn Storage API (required)
+//   - options: A variadic list of ClientOption functions to customize the client
+//
+// Returns:
+//   - *Client: A configured Storage client instance
+//   - error: An error if the URL cannot be parsed
 func NewClientWithOptions(baseURL string, options ...ClientOption) (*Client, error) {
 	client, err := NewClient(baseURL)
 	if err != nil {
@@ -94,17 +141,12 @@ func NewClientWithOptions(baseURL string, options ...ClientOption) (*Client, err
 
 // newRequest creates an API request with the specified method, path, and body
 func (c *Client) newRequest(ctx context.Context, method, path string, body interface{}) (*http.Request, error) {
-	rel, err := url.Parse(path)
-	if err != nil {
-		return nil, err
-	}
-
-	u := c.BaseURL.ResolveReference(rel)
+	u := c.BaseURL.JoinPath(path)
 
 	var buf io.ReadWriter
 	if body != nil {
 		buf = new(bytes.Buffer)
-		err = json.NewEncoder(buf).Encode(body)
+		err := json.NewEncoder(buf).Encode(body)
 		if err != nil {
 			return nil, err
 		}
@@ -137,94 +179,24 @@ func (c *Client) newRequest(ctx context.Context, method, path string, body inter
 
 // do sends an API request and returns the API response
 func (c *Client) do(req *http.Request, v interface{}) (*http.Response, error) {
-	// Send the request
-	resp, err := c.HTTPClient.Do(req)
-	if err != nil {
-		// Handle network-level errors
-		if urlErr, ok := err.(*url.Error); ok {
-			if urlErr.Timeout() {
-				return nil, &ErrorResponse{
-					ErrorCode:   "request_timeout",
-					Description: "The request timed out. Please check your network connection and try again.",
-				}
-			} else if urlErr.Temporary() {
-				return nil, &ErrorResponse{
-					ErrorCode:   "temporary_error",
-					Description: "A temporary network error occurred. Please try again later.",
-				}
-			}
-		}
-		return nil, &ErrorResponse{
-			ErrorCode:   "network_error",
-			Description: fmt.Sprintf("Failed to connect to the storage service: %v", err),
-		}
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	// Read the response body
-	bodyBytes, _ := io.ReadAll(resp.Body)
-	// Reset the body with a new ReadCloser for further processing
-	resp.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
-
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		var errResp ErrorResponse
-
-		// We already have the body bytes, no need to read again
-		if len(bodyBytes) > 0 {
-			if jsonErr := json.Unmarshal(bodyBytes, &errResp); jsonErr != nil {
-				// Not valid JSON or unexpected format
-				return nil, &ErrorResponse{
-					ErrorCode:   "parse_error",
-					Description: fmt.Sprintf("HTTP error %d with invalid response format", resp.StatusCode),
-				}
-			}
-		}
-
-		// If we received an empty error response, create a user-friendly error based on status code
-		if errResp.ErrorCode == "" && errResp.Description == "" {
-			switch resp.StatusCode {
-			case 400:
-				errResp.ErrorCode = "bad_request"
-				errResp.Description = "The request was invalid. Please check your input and try again."
-			case 401:
-				errResp.ErrorCode = "unauthorized"
-				errResp.Description = "Authentication failed. Please check your credentials or login again."
-			case 403:
-				errResp.ErrorCode = "forbidden"
-				errResp.Description = "You don't have permission to access this resource."
-			case 404:
-				errResp.ErrorCode = "not_found"
-				errResp.Description = "The requested resource was not found."
-			case 429:
-				errResp.ErrorCode = "rate_limited"
-				errResp.Description = "Too many requests. Please try again later."
-			case 500, 502, 503, 504:
-				errResp.ErrorCode = "server_error"
-				errResp.Description = "The storage service is currently unavailable. Please try again later."
-			default:
-				errResp.ErrorCode = "unknown_error"
-				errResp.Description = fmt.Sprintf("Unexpected HTTP status: %d", resp.StatusCode)
-			}
-		}
-
-		return nil, &errResp
-	}
-
-	if v != nil {
-		// We already have the body bytes, decode from there
-		err = json.Unmarshal(bodyBytes, v)
-		if err != nil {
-			return nil, &ErrorResponse{
-				ErrorCode:   "parse_error",
-				Description: fmt.Sprintf("Failed to parse the successful response: %v", err),
-			}
-		}
-	}
-
-	return resp, nil
+	return clientutil.ExecuteRequest(req.Context(), c.HTTPClient, req, v)
 }
 
-// GenerateUploadURL generates a pre-signed URL for uploading a file to storage
+// GenerateUploadURL generates a pre-signed URL for uploading a file to storage.
+//
+// Parameters:
+//   - ctx: Context for the API request
+//   - request: GenerateUploadURLRequest containing file metadata (required fields: Filename, ContentType)
+//
+// Returns:
+//   - *GenerateUploadURLResponse: The response containing the pre-signed URL for upload
+//   - error: An error if the operation fails, which can be:
+//     * apierror.ErrorResponse with codes like:
+//       - "bad_request" if the request is invalid
+//       - "unauthorized" if authentication fails
+//       - "forbidden" if the caller lacks permissions
+//       - "network_error" if the connection fails
+//       - "server_error" if generating the upload URL fails
 func (c *Client) GenerateUploadURL(ctx context.Context, request *GenerateUploadURLRequest) (*GenerateUploadURLResponse, error) {
 	req, err := c.newRequest(ctx, "POST", "/generate-upload-url", request)
 	if err != nil {
@@ -240,7 +212,22 @@ func (c *Client) GenerateUploadURL(ctx context.Context, request *GenerateUploadU
 	return &resp, nil
 }
 
-// GenerateDownloadURL generates a pre-signed URL for downloading a file from storage
+// GenerateDownloadURL generates a pre-signed URL for downloading a file from storage.
+//
+// Parameters:
+//   - ctx: Context for the API request
+//   - request: GenerateDownloadURLRequest containing the S3 key of the file (required field: S3Key)
+//
+// Returns:
+//   - *GenerateDownloadURLResponse: The response containing the pre-signed URL for download
+//   - error: An error if the operation fails, which can be:
+//     * apierror.ErrorResponse with codes like:
+//       - "bad_request" if the request is invalid
+//       - "unauthorized" if authentication fails
+//       - "forbidden" if the caller lacks permissions
+//       - "not_found" if the file doesn't exist
+//       - "network_error" if the connection fails
+//       - "server_error" if generating the download URL fails
 func (c *Client) GenerateDownloadURL(ctx context.Context, request *GenerateDownloadURLRequest) (*GenerateDownloadURLResponse, error) {
 	req, err := c.newRequest(ctx, "POST", "/generate-download-url", request)
 	if err != nil {
@@ -254,4 +241,28 @@ func (c *Client) GenerateDownloadURL(ctx context.Context, request *GenerateDownl
 	}
 
 	return &resp, nil
+}
+
+// GenerateDownloadURLFromKey generates a pre-signed URL for downloading a file using just the S3 key.
+// This is a convenience method that wraps GenerateDownloadURL.
+//
+// Parameters:
+//   - ctx: Context for the API request
+//   - s3Key: The S3 key of the file to download (required)
+//
+// Returns:
+//   - *GenerateDownloadURLResponse: The response containing the pre-signed URL for download
+//   - error: An error if the operation fails, which can be:
+//     * apierror.ErrorResponse with codes like:
+//       - "bad_request" if the key is invalid
+//       - "unauthorized" if authentication fails
+//       - "forbidden" if the caller lacks permissions
+//       - "not_found" if the file doesn't exist
+//       - "network_error" if the connection fails
+//       - "server_error" if generating the download URL fails
+func (c *Client) GenerateDownloadURLFromKey(ctx context.Context, s3Key string) (*GenerateDownloadURLResponse, error) {
+	request := &GenerateDownloadURLRequest{
+		S3Key: s3Key,
+	}
+	return c.GenerateDownloadURL(ctx, request)
 }

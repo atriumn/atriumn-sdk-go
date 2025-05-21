@@ -1,0 +1,45 @@
+name: Notify Slack on PR Ready
+
+on:
+  pull_request:
+    types: [ready_for_review]
+
+jobs:
+  slack_notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notify via Slack
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          PR_URL="https://github.com/${{ github.repository }}/pull/${{ github.event.pull_request.number }}"
+          PR_TITLE="${{ github.event.pull_request.title }}"
+          PR_AUTHOR="${{ github.event.pull_request.user.login }}"
+          
+          curl -X POST -H 'Content-type: application/json' \
+            --data "{
+              \"attachments\": [
+                {
+                  \"color\": \"#2eb886\",
+                  \"blocks\": [
+                    {
+                      \"type\": \"section\",
+                      \"text\": {
+                        \"type\": \"mrkdwn\",
+                        \"text\": \"🛎️ *PR #${{ github.event.pull_request.number }}* is ready for review\\n*Title:* $PR_TITLE\\n*Author:* $PR_AUTHOR\\n<$PR_URL|Open PR>\"
+                      }
+                    },
+                    {
+                      \"type\": \"context\",
+                      \"elements\": [
+                        {
+                          \"type\": \"mrkdwn\",
+                          \"text\": \"Repository: ${{ github.repository }}\"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }" \
+            $SLACK_WEBHOOK_URL

@@ -1,0 +1,72 @@
+You're tasked with analyzing a Product Requirements Document (PRD) to determine its impact on the Atriumn repository ecosystem. This analysis will help teams understand which repositories will be affected and how to coordinate implementation across repository boundaries.
+
+First, analyze the PRD content:
+1. Identify the core functionality and requirements described in the PRD
+2. Extract key features, components, and integration points
+3. Note any explicit repository references or technical constraints
+
+Next, analyze repository impact using the Repository Map:
+1. Identify the primary repository for implementation
+   - Which repository has the most logical ownership of this feature?
+   - Consider data ownership, functional boundaries, and domain responsibilities
+   - Reference the Repository Map's ownership boundaries and decision framework
+
+2. Identify secondary repositories that will be affected
+   - Which other repositories will need changes to support this feature?
+   - Consider interfaces, data flows, and dependencies
+   - Are there cross-repository integration points?
+
+3. Analyze cross-cutting concerns
+   - Are there authentication, security, or compliance implications?
+   - Does this feature require updates to workflows or CI/CD pipelines?
+   - Will this feature impact multiple UI components or services?
+
+4. Evaluate boundary changes
+   - Does this feature suggest a need to reconsider repository boundaries?
+   - Does it create new interfaces between repositories?
+   - Are there opportunities to refactor responsibilities between repositories?
+
+Provide your analysis in this structured format:
+
+## Repository Impact Analysis
+
+### Primary Repository
+- **Recommended Repository**: [Repository Name]
+- **Confidence Level**: [High/Medium/Low]
+- **Rationale**: [Brief explanation of why this repository is the primary owner]
+- **Implementation Considerations**: 
+  - [Key points about implementation in this repository]
+  - [Technical considerations]
+  - [Potential challenges]
+
+### Secondary Repositories
+1. **[Repository Name]**
+   - **Impact Level**: [High/Medium/Low]
+   - **Required Changes**: [Brief description of changes needed]
+   - **Interface Considerations**: [How this repository will interact with the primary repository]
+
+2. **[Repository Name]**
+   - **Impact Level**: [High/Medium/Low]
+   - **Required Changes**: [Brief description of changes needed]
+   - **Interface Considerations**: [How this repository will interact with the primary repository]
+
+### Cross-Repository Concerns
+- **Data Flow Impacts**: [How data will flow between repositories]
+- **Interface Contract Changes**: [Required API or event changes]
+- **Deployment Coordination**: [How deployments should be sequenced]
+- **Testing Requirements**: [Cross-repository testing considerations]
+
+### Implementation Recommendations
+- **Suggested Approach**: [High-level implementation strategy]
+- **Coordination Requirements**: [How teams should coordinate]
+- **Potential Risks**: [Risks specific to repository boundaries]
+- **Architecture Considerations**: [Suggestions for architectural approach]
+
+Guidelines:
+- Be concise but thorough in your analysis
+- Reference the Repository Map's ownership boundaries and decision framework
+- Provide specific rationale for each recommendation
+- Indicate confidence levels for your recommendations
+- Consider both immediate implementation and long-term maintenance
+- Focus on repository boundaries, not implementation details
+- Suggest process improvements for similar features in the future

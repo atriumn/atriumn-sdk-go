@@ -132,7 +132,12 @@ fmt.Printf("Ingestion ID: %s\n", response.ID)
 fmt.Printf("Status: %s\n", response.Status)
 ```
 
-### Ingesting File
+### Uploading Files (Two-Step Process)
+
+The SDK uses a two-step process for file uploads:
+
+1. Request a pre-signed URL by sending file metadata
+2. Upload the file content directly to the pre-signed URL
 
 ```go
 ctx := context.Background()
@@ -144,21 +149,39 @@ if err != nil {
 }
 defer file.Close()
 
-// Send the request
-response, err := client.IngestFile(
-    ctx,
-    "tenant-123",
-    "document.pdf",
-    "application/pdf",
-    "user-456",
-    file,
-)
-if err != nil {
-    log.Fatalf("Failed to ingest file: %v", err)
+// Step 1: Request a file upload URL
+uploadRequest := &ingest.RequestFileUploadRequest{
+    Filename:    "document.pdf",
+    ContentType: "application/pdf",
+    TenantID:    "tenant-123",
+    UserID:      "user-456",
+    Metadata: map[string]string{
+        "source": "local-drive",
+        "category": "document",
+    },
 }
 
-fmt.Printf("Ingestion ID: %s\n", response.ID)
-fmt.Printf("Status: %s\n", response.Status)
+uploadResponse, err := client.RequestFileUpload(ctx, uploadRequest)
+if err != nil {
+    log.Fatalf("Failed to request file upload URL: %v", err)
+}
+
+fmt.Printf("Content ID: %s\n", uploadResponse.ContentID)
+fmt.Printf("Upload URL: %s\n", uploadResponse.UploadURL)
+
+// Ensure file cursor is at the beginning
+if _, err := file.Seek(0, 0); err != nil {
+    log.Fatalf("Failed to seek to beginning of file: %v", err)
+}
+
+// Step 2: Upload the file directly to the pre-signed URL
+resp, err := client.UploadToURL(ctx, uploadResponse.UploadURL, "application/pdf", file)
+if err != nil {
+    log.Fatalf("Failed to upload file: %v", err)
+}
+defer resp.Body.Close()
+
+fmt.Printf("Upload status: %d\n", resp.StatusCode)
 ```
 
 ### Error Handling

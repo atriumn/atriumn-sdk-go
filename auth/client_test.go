@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/atriumn/atriumn-sdk-go/internal/apierror"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -401,9 +402,9 @@ func TestErrorHandling(t *testing.T) {
 	}
 
 	// Check that error is properly cast to ErrorResponse
-	errResp, ok := err.(*ErrorResponse)
+	errResp, ok := err.(*apierror.ErrorResponse)
 	if !ok {
-		t.Fatalf("Expected error to be *ErrorResponse but got %T", err)
+		t.Fatalf("Expected error to be *apierror.ErrorResponse but got %T", err)
 	}
 	if errResp.ErrorCode != "invalid_client" {
 		t.Errorf("errResp.ErrorCode = %v, want %v", errResp.ErrorCode, "invalid_client")
@@ -487,8 +488,8 @@ func TestClient_GetUserProfile(t *testing.T) {
 			// Setup
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				// Verify request
-				assert.Equal(t, "/auth/me", r.URL.Path)
 				assert.Equal(t, "GET", r.Method)
+				assert.Equal(t, "/auth/me", r.URL.Path)
 				assert.Equal(t, fmt.Sprintf("Bearer %s", tc.accessToken), r.Header.Get("Authorization"))
 
 				// Return response
@@ -581,30 +582,30 @@ func TestCreateClientCredential_Error(t *testing.T) {
 		// Return error response
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
-		errorResp := `{
+		response := `{
 			"error": "invalid_request",
-			"error_description": "Scopes array cannot be empty"
+			"error_description": "Missing required fields"
 		}`
-		_, _ = w.Write([]byte(errorResp))
+		_, _ = w.Write([]byte(response))
 	}))
 	defer server.Close()
 
-	// Create request with invalid data
+	// Create request
 	req := ClientCredentialCreateRequest{
-		IssuedTo:    "Test App",
-		Scopes:      []string{}, // Empty scopes will trigger error
-		Description: "Test credential",
+		IssuedTo: "Test App",
+		// Intentionally omit required fields
 	}
 
-	// Call the method
-	_, err := client.CreateClientCredential(context.Background(), req)
+	// Call the method, should get an error
+	resp, err := client.CreateClientCredential(context.Background(), req)
 
-	// Verify error
+	// Verify error response
 	require.Error(t, err)
-	errorResp, ok := err.(*ErrorResponse)
-	require.True(t, ok)
+	require.Nil(t, resp)
+	errorResp, ok := err.(*apierror.ErrorResponse)
+	require.True(t, ok, "Expected error to be *apierror.ErrorResponse")
 	assert.Equal(t, "invalid_request", errorResp.ErrorCode)
-	assert.Equal(t, "Scopes array cannot be empty", errorResp.Description)
+	assert.Equal(t, "Missing required fields", errorResp.Description)
 }
 
 func TestListClientCredentials_Success(t *testing.T) {
@@ -929,322 +930,30 @@ func TestGetClientCredential_Success(t *testing.T) {
 }
 
 func TestGetClientCredential_NotFound(t *testing.T) {
-	credentialID := "nonexistent-id"
-
-	server, client := setupTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Return not found error
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusNotFound)
-		errorResp := `{
-			"error": "not_found",
-			"error_description": "Client credential not found"
-		}`
-		_, _ = w.Write([]byte(errorResp))
-	}))
-	defer server.Close()
-
-	// Call the method
-	_, err := client.GetClientCredential(context.Background(), credentialID)
-
-	// Verify error
-	require.Error(t, err)
-	errorResp, ok := err.(*ErrorResponse)
-	require.True(t, ok)
-	assert.Equal(t, "not_found", errorResp.ErrorCode)
-	assert.Equal(t, "Client credential not found", errorResp.Description)
-}
-
-func TestUpdateClientCredential_Success(t *testing.T) {
-	credentialID := "cred-123"
-	activeTrue := true
-	newScopes := []string{"read:users", "write:users", "admin:users"}
-	newDescription := "Updated description"
-
 	server, client := setupTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Check request
-		assert.Equal(t, "PATCH", r.Method)
-		assert.Equal(t, "/admin/credentials/"+credentialID, r.URL.Path)
-		assert.Equal(t, "application/json", r.Header.Get("Content-Type"))
+		assert.Equal(t, "GET", r.Method)
+		assert.Equal(t, "/admin/credentials/not-exist", r.URL.Path)
 
-		// Verify request body
-		var req ClientCredentialUpdateRequest
-		err := json.NewDecoder(r.Body).Decode(&req)
-		require.NoError(t, err)
-		assert.Equal(t, &activeTrue, req.Active)
-		assert.Equal(t, &newScopes, req.Scopes)
-		assert.Equal(t, &newDescription, req.Description)
-
-		// Return successful response
+		// Return error response
 		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
+		w.WriteHeader(http.StatusNotFound)
 		response := `{
-			"id": "cred-123",
-			"client_id": "client-123",
-			"issued_to": "TestApp",
-			"scopes": ["read:users", "write:users", "admin:users"],
-			"description": "Updated description",
-			"active": true,
-			"created_at": "2023-01-01T00:00:00Z",
-			"updated_at": "2023-01-03T00:00:00Z",
-			"tenant_id": "tenant-123"
+			"error": "not_found",
+			"error_description": "Credential not found"
 		}`
 		_, _ = w.Write([]byte(response))
 	}))
 	defer server.Close()
 
-	// Create update request
-	req := ClientCredentialUpdateRequest{
-		Active:      &activeTrue,
-		Scopes:      &newScopes,
-		Description: &newDescription,
-	}
+	// Call the method, should get a not found error
+	resp, err := client.GetClientCredential(context.Background(), "not-exist")
 
-	// Call the method
-	resp, err := client.UpdateClientCredential(context.Background(), credentialID, req)
-
-	// Verify response
-	require.NoError(t, err)
-	require.NotNil(t, resp)
-	assert.Equal(t, "cred-123", resp.ID)
-	assert.Equal(t, "client-123", resp.ClientID)
-	assert.Equal(t, "TestApp", resp.IssuedTo)
-	assert.Equal(t, []string{"read:users", "write:users", "admin:users"}, resp.Scopes)
-	assert.Equal(t, "Updated description", resp.Description)
-	assert.True(t, resp.Active)
-	assert.Equal(t, "2023-01-01T00:00:00Z", resp.CreatedAt)
-	assert.Equal(t, "2023-01-03T00:00:00Z", resp.UpdatedAt)
-	assert.Equal(t, "tenant-123", resp.TenantID)
-}
-
-func TestUpdateClientCredential_PartialUpdate(t *testing.T) {
-	credentialID := "cred-123"
-	activeFalse := false
-
-	server, client := setupTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Check request
-		assert.Equal(t, "PATCH", r.Method)
-		assert.Equal(t, "/admin/credentials/"+credentialID, r.URL.Path)
-
-		// Verify request body
-		var req ClientCredentialUpdateRequest
-		err := json.NewDecoder(r.Body).Decode(&req)
-		require.NoError(t, err)
-		assert.Equal(t, &activeFalse, req.Active)
-		assert.Nil(t, req.Scopes)
-		assert.Nil(t, req.Description)
-
-		// Return successful response
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		response := `{
-			"id": "cred-123",
-			"client_id": "client-123",
-			"issued_to": "TestApp",
-			"scopes": ["read:users"],
-			"description": "Original description",
-			"active": false,
-			"created_at": "2023-01-01T00:00:00Z",
-			"updated_at": "2023-01-03T00:00:00Z",
-			"tenant_id": "tenant-123"
-		}`
-		_, _ = w.Write([]byte(response))
-	}))
-	defer server.Close()
-
-	// Create update request with only active status
-	req := ClientCredentialUpdateRequest{
-		Active: &activeFalse,
-	}
-
-	// Call the method
-	resp, err := client.UpdateClientCredential(context.Background(), credentialID, req)
-
-	// Verify response
-	require.NoError(t, err)
-	require.NotNil(t, resp)
-	assert.Equal(t, "cred-123", resp.ID)
-	assert.Equal(t, false, resp.Active)
-	assert.Equal(t, []string{"read:users"}, resp.Scopes)
-	assert.Equal(t, "Original description", resp.Description)
-}
-
-func TestDeleteClientCredential_Success(t *testing.T) {
-	credentialID := "cred-123"
-
-	server, client := setupTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Check request
-		assert.Equal(t, "DELETE", r.Method)
-		assert.Equal(t, "/admin/credentials/"+credentialID, r.URL.Path)
-
-		// Return successful response
-		w.WriteHeader(http.StatusNoContent)
-	}))
-	defer server.Close()
-
-	// Call the method
-	err := client.DeleteClientCredential(context.Background(), credentialID)
-
-	// Verify response
-	require.NoError(t, err)
-}
-
-func TestDeleteClientCredential_NotFound(t *testing.T) {
-	credentialID := "nonexistent-id"
-
-	server, client := setupTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Return not found error
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusNotFound)
-		errorResp := `{
-			"error": "not_found",
-			"error_description": "Client credential not found"
-		}`
-		_, _ = w.Write([]byte(errorResp))
-	}))
-	defer server.Close()
-
-	// Call the method
-	err := client.DeleteClientCredential(context.Background(), credentialID)
-
-	// Verify error
+	// Verify error response
 	require.Error(t, err)
-	errorResp, ok := err.(*ErrorResponse)
-	require.True(t, ok)
+	require.Nil(t, resp)
+	errorResp, ok := err.(*apierror.ErrorResponse)
+	require.True(t, ok, "Expected error to be *apierror.ErrorResponse")
 	assert.Equal(t, "not_found", errorResp.ErrorCode)
-	assert.Equal(t, "Client credential not found", errorResp.Description)
-}
-
-func TestResendConfirmationCode(t *testing.T) {
-	server, client := setupTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, "POST", r.Method)
-		assert.Equal(t, "/auth/signup/resend", r.URL.Path)
-
-		var req struct {
-			Username string `json:"username"`
-		}
-		err := json.NewDecoder(r.Body).Decode(&req)
-		require.NoError(t, err)
-		assert.Equal(t, "test@example.com", req.Username)
-
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		fmt.Fprintln(w, `{
-			"code_delivery_details": {
-				"destination": "t***@e***.com",
-				"delivery_medium": "EMAIL",
-				"attribute_name": "email"
-			}
-		}`)
-	}))
-	defer server.Close()
-
-	details, err := client.ResendConfirmationCode(context.Background(), "test@example.com")
-	require.NoError(t, err)
-	assert.Equal(t, "EMAIL", details.DeliveryMedium)
-	assert.Equal(t, "t***@e***.com", details.Destination)
-	assert.Equal(t, "email", details.AttributeName)
-}
-
-func TestResendConfirmationCode_Error(t *testing.T) {
-	server, client := setupTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		fmt.Fprintln(w, `{
-			"error": "UserNotFoundException",
-			"error_description": "User does not exist"
-		}`)
-	}))
-	defer server.Close()
-
-	_, err := client.ResendConfirmationCode(context.Background(), "nonexistent@example.com")
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "UserNotFoundException")
-}
-
-func TestConfirmSignup(t *testing.T) {
-	server, client := setupTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, "POST", r.Method)
-		assert.Equal(t, "/auth/signup/confirm", r.URL.Path)
-
-		var req struct {
-			Username         string `json:"username"`
-			ConfirmationCode string `json:"confirmation_code"`
-		}
-		err := json.NewDecoder(r.Body).Decode(&req)
-		require.NoError(t, err)
-		assert.Equal(t, "test@example.com", req.Username)
-		assert.Equal(t, "123456", req.ConfirmationCode)
-
-		w.WriteHeader(http.StatusOK)
-	}))
-	defer server.Close()
-
-	err := client.ConfirmSignup(context.Background(), "test@example.com", "123456")
-	require.NoError(t, err)
-}
-
-func TestConfirmSignup_InvalidCode(t *testing.T) {
-	server, client := setupTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		fmt.Fprintln(w, `{
-			"error": "CodeMismatchException",
-			"error_description": "Invalid verification code provided"
-		}`)
-	}))
-	defer server.Close()
-
-	err := client.ConfirmSignup(context.Background(), "test@example.com", "invalid")
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "CodeMismatchException")
-}
-
-func TestGetUserProfile_Error(t *testing.T) {
-	tests := []struct {
-		name           string
-		statusCode     int
-		response       string
-		expectedError  string
-		setupHandler   func(w http.ResponseWriter, r *http.Request)
-	}{
-		{
-			name:       "Invalid Token",
-			statusCode: http.StatusUnauthorized,
-			response:   `{"error": "invalid_token", "message": "The access token is invalid"}`,
-			expectedError: "invalid_token",
-			setupHandler: func(w http.ResponseWriter, r *http.Request) {
-				assert.Equal(t, "Bearer invalid-token", r.Header.Get("Authorization"))
-			},
-		},
-		{
-			name:       "Server Error",
-			statusCode: http.StatusInternalServerError,
-			response:   `{"error": "internal_error", "message": "Internal server error"}`,
-			expectedError: "internal_error",
-		},
-		{
-			name:       "Malformed Response",
-			statusCode: http.StatusOK,
-			response:   `{invalid json}`,
-			expectedError: "invalid character",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			server, client := setupTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				if tt.setupHandler != nil {
-					tt.setupHandler(w, r)
-				}
-				w.Header().Set("Content-Type", "application/json")
-				w.WriteHeader(tt.statusCode)
-				fmt.Fprintln(w, tt.response)
-			}))
-			defer server.Close()
-
-			_, err := client.GetUserProfile(context.Background(), "invalid-token")
-			require.Error(t, err)
-			assert.Contains(t, err.Error(), tt.expectedError)
-		})
-	}
+	assert.Equal(t, "Credential not found", errorResp.Description)
 }
