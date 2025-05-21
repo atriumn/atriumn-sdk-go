@@ -102,4 +102,4 @@ type ListPromptsOptions struct {
 	MaxResults int `json:"maxResults,omitempty"`
 	// NextToken is the pagination token for retrieving the next set of results
 	NextToken string `json:"nextToken,omitempty"`
-} 
+}

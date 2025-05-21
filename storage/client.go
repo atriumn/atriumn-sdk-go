@@ -191,12 +191,12 @@ func (c *Client) do(req *http.Request, v interface{}) (*http.Response, error) {
 // Returns:
 //   - *GenerateUploadURLResponse: The response containing the pre-signed URL for upload
 //   - error: An error if the operation fails, which can be:
-//     * apierror.ErrorResponse with codes like:
-//       - "bad_request" if the request is invalid
-//       - "unauthorized" if authentication fails
-//       - "forbidden" if the caller lacks permissions
-//       - "network_error" if the connection fails
-//       - "server_error" if generating the upload URL fails
+//   - apierror.ErrorResponse with codes like:
+//   - "bad_request" if the request is invalid
+//   - "unauthorized" if authentication fails
+//   - "forbidden" if the caller lacks permissions
+//   - "network_error" if the connection fails
+//   - "server_error" if generating the upload URL fails
 func (c *Client) GenerateUploadURL(ctx context.Context, request *GenerateUploadURLRequest) (*GenerateUploadURLResponse, error) {
 	req, err := c.newRequest(ctx, "POST", "/generate-upload-url", request)
 	if err != nil {
@@ -221,13 +221,13 @@ func (c *Client) GenerateUploadURL(ctx context.Context, request *GenerateUploadU
 // Returns:
 //   - *GenerateDownloadURLResponse: The response containing the pre-signed URL for download
 //   - error: An error if the operation fails, which can be:
-//     * apierror.ErrorResponse with codes like:
-//       - "bad_request" if the request is invalid
-//       - "unauthorized" if authentication fails
-//       - "forbidden" if the caller lacks permissions
-//       - "not_found" if the file doesn't exist
-//       - "network_error" if the connection fails
-//       - "server_error" if generating the download URL fails
+//   - apierror.ErrorResponse with codes like:
+//   - "bad_request" if the request is invalid
+//   - "unauthorized" if authentication fails
+//   - "forbidden" if the caller lacks permissions
+//   - "not_found" if the file doesn't exist
+//   - "network_error" if the connection fails
+//   - "server_error" if generating the download URL fails
 func (c *Client) GenerateDownloadURL(ctx context.Context, request *GenerateDownloadURLRequest) (*GenerateDownloadURLResponse, error) {
 	req, err := c.newRequest(ctx, "POST", "/generate-download-url", request)
 	if err != nil {
@@ -253,13 +253,13 @@ func (c *Client) GenerateDownloadURL(ctx context.Context, request *GenerateDownl
 // Returns:
 //   - *GenerateDownloadURLResponse: The response containing the pre-signed URL for download
 //   - error: An error if the operation fails, which can be:
-//     * apierror.ErrorResponse with codes like:
-//       - "bad_request" if the key is invalid
-//       - "unauthorized" if authentication fails
-//       - "forbidden" if the caller lacks permissions
-//       - "not_found" if the file doesn't exist
-//       - "network_error" if the connection fails
-//       - "server_error" if generating the download URL fails
+//   - apierror.ErrorResponse with codes like:
+//   - "bad_request" if the key is invalid
+//   - "unauthorized" if authentication fails
+//   - "forbidden" if the caller lacks permissions
+//   - "not_found" if the file doesn't exist
+//   - "network_error" if the connection fails
+//   - "server_error" if generating the download URL fails
 func (c *Client) GenerateDownloadURLFromKey(ctx context.Context, s3Key string) (*GenerateDownloadURLResponse, error) {
 	request := &GenerateDownloadURLRequest{
 		S3Key: s3Key,

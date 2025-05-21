@@ -251,8 +251,8 @@ func TestClient_DeletePrompt(t *testing.T) {
 func TestClient_ListPrompts(t *testing.T) {
 	// Variables to capture the request
 	var (
-		capturedPath    string
-		capturedModelID string
+		capturedPath       string
+		capturedModelID    string
 		capturedMaxResults string
 	)
 
@@ -361,4 +361,4 @@ func TestClient_newRequest(t *testing.T) {
 	if req.Header.Get("User-Agent") != DefaultUserAgent {
 		t.Errorf("newRequest() User-Agent = %v, want %v", req.Header.Get("User-Agent"), DefaultUserAgent)
 	}
-} 
+}

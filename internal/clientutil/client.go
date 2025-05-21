@@ -57,7 +57,7 @@ func ExecuteRequest(ctx context.Context, httpClient *http.Client, req *http.Requ
 			Description: fmt.Sprintf("Failed to read response body: %v", err),
 		}
 	}
-	
+
 	// Reset the body with a new ReadCloser for further processing if needed
 	resp.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
 
@@ -67,8 +67,8 @@ func ExecuteRequest(ctx context.Context, httpClient *http.Client, req *http.Requ
 
 		// Try to unmarshal the error response
 		if len(bodyBytes) > 0 {
-			if jsonErr := json.Unmarshal(bodyBytes, &errResp); jsonErr == nil && 
-               (errResp.ErrorCode != "" || errResp.Description != "") {
+			if jsonErr := json.Unmarshal(bodyBytes, &errResp); jsonErr == nil &&
+				(errResp.ErrorCode != "" || errResp.Description != "") {
 				// Successfully parsed error with at least some data
 				return nil, &errResp
 			}
@@ -120,4 +120,4 @@ func ExecuteRequest(ctx context.Context, httpClient *http.Client, req *http.Requ
 	}
 
 	return resp, nil
-} 
+}

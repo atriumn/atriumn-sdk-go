@@ -154,11 +154,11 @@ func NewClientWithOptions(baseURL string, options ...ClientOption) (*Client, err
 // Returns:
 //   - *IngestResponse: Details about the ingested content if successful
 //   - error: An error if the operation fails, which can be:
-//     * apierror.ErrorResponse with codes like:
-//       - "bad_request" if the request is invalid
-//       - "unauthorized" if authentication fails
-//       - "forbidden" if the caller lacks permissions
-//       - "network_error" if the connection fails
+//   - apierror.ErrorResponse with codes like:
+//   - "bad_request" if the request is invalid
+//   - "unauthorized" if authentication fails
+//   - "forbidden" if the caller lacks permissions
+//   - "network_error" if the connection fails
 func (c *Client) IngestText(ctx context.Context, request *IngestTextRequest) (*IngestResponse, error) {
 	httpReq, err := c.newRequest(ctx, "POST", "/ingest/text", request)
 	if err != nil {
@@ -183,11 +183,11 @@ func (c *Client) IngestText(ctx context.Context, request *IngestTextRequest) (*I
 // Returns:
 //   - *IngestURLResponse: An asynchronous response with ID and status (PENDING/QUEUED)
 //   - error: An error if the operation fails, which can be:
-//     * apierror.ErrorResponse with codes like:
-//       - "bad_request" if the URL is invalid
-//       - "unauthorized" if authentication fails
-//       - "forbidden" if the caller lacks permissions
-//       - "network_error" if the connection fails
+//   - apierror.ErrorResponse with codes like:
+//   - "bad_request" if the URL is invalid
+//   - "unauthorized" if authentication fails
+//   - "forbidden" if the caller lacks permissions
+//   - "network_error" if the connection fails
 func (c *Client) IngestURL(ctx context.Context, request *IngestURLRequest) (*IngestURLResponse, error) {
 	httpReq, err := c.newRequest(ctx, "POST", "/ingest/url", request)
 	if err != nil {
@@ -221,12 +221,12 @@ func (c *Client) IngestURL(ctx context.Context, request *IngestURLRequest) (*Ing
 // Returns:
 //   - *IngestResponse: Details about the ingested file if successful
 //   - error: An error if the operation fails, which can be:
-//     * apierror.ErrorResponse with codes like:
-//       - "bad_request" if the request is invalid
-//       - "unauthorized" if authentication fails
-//       - "forbidden" if the caller lacks permissions
-//       - "network_error" if the connection fails
-//       - "parse_error" if there's an issue with processing the file
+//   - apierror.ErrorResponse with codes like:
+//   - "bad_request" if the request is invalid
+//   - "unauthorized" if authentication fails
+//   - "forbidden" if the caller lacks permissions
+//   - "network_error" if the connection fails
+//   - "parse_error" if there's an issue with processing the file
 func (c *Client) IngestFile(ctx context.Context, tenantID string, filename string, contentType string, userID string, fileReader io.Reader) (*IngestResponse, error) {
 	// Create multipart writer
 	body := &bytes.Buffer{}
@@ -304,12 +304,12 @@ func (c *Client) IngestFile(ctx context.Context, tenantID string, filename strin
 // Returns:
 //   - *RequestFileUploadResponse: The response containing the pre-signed URL for direct S3 upload
 //   - error: An error if the operation fails, which can be:
-//     * apierror.ErrorResponse with codes like:
-//       - "bad_request" if the request is invalid
-//       - "unauthorized" if authentication fails
-//       - "forbidden" if the caller lacks permissions
-//       - "network_error" if the connection fails
-//       - "server_error" if generating the upload URL fails
+//   - apierror.ErrorResponse with codes like:
+//   - "bad_request" if the request is invalid
+//   - "unauthorized" if authentication fails
+//   - "forbidden" if the caller lacks permissions
+//   - "network_error" if the connection fails
+//   - "server_error" if generating the upload URL fails
 func (c *Client) RequestFileUpload(ctx context.Context, request *RequestFileUploadRequest) (*RequestFileUploadResponse, error) {
 	// Use the internal newRequest helper to create the POST request
 	// The path should now be `/ingest/file` based on service refactor. Double-check service route.
@@ -338,12 +338,12 @@ func (c *Client) RequestFileUpload(ctx context.Context, request *RequestFileUplo
 // Returns:
 //   - *RequestTextUploadResponse: The response containing the pre-signed URL for direct S3 upload
 //   - error: An error if the operation fails, which can be:
-//     * apierror.ErrorResponse with codes like:
-//       - "bad_request" if the request is invalid
-//       - "unauthorized" if authentication fails
-//       - "forbidden" if the caller lacks permissions
-//       - "network_error" if the connection fails
-//       - "server_error" if generating the upload URL fails
+//   - apierror.ErrorResponse with codes like:
+//   - "bad_request" if the request is invalid
+//   - "unauthorized" if authentication fails
+//   - "forbidden" if the caller lacks permissions
+//   - "network_error" if the connection fails
+//   - "server_error" if generating the upload URL fails
 func (c *Client) RequestTextUpload(ctx context.Context, request *RequestTextUploadRequest) (*RequestTextUploadResponse, error) {
 	httpReq, err := c.newRequest(ctx, "POST", "/ingest/text", request)
 	if err != nil {
@@ -370,9 +370,9 @@ func (c *Client) RequestTextUpload(ctx context.Context, request *RequestTextUplo
 // Returns:
 //   - *http.Response: The raw HTTP response from the upload operation
 //   - error: An error if the upload fails, which can include:
-//     * Network errors if the connection fails
-//     * S3-specific errors if the upload is rejected
-//     * Context cancellation errors
+//   - Network errors if the connection fails
+//   - S3-specific errors if the upload is rejected
+//   - Context cancellation errors
 func (c *Client) UploadToURL(ctx context.Context, uploadURL string, contentType string, fileReader io.Reader) (*http.Response, error) {
 	// Create a new HTTP request with the provided upload URL
 	req, err := http.NewRequestWithContext(ctx, "PUT", uploadURL, fileReader)
@@ -396,7 +396,7 @@ func (c *Client) UploadToURL(ctx context.Context, uploadURL string, contentType 
 	standardClient := &http.Client{
 		Timeout: 60 * time.Second, // Set a reasonable timeout
 	}
-	
+
 	resp, err := standardClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to upload to URL: %w", err)
@@ -467,11 +467,11 @@ func (c *Client) do(req *http.Request, v interface{}) (*http.Response, error) {
 // Returns:
 //   - *ContentItem: The content item details if found
 //   - error: An error if the operation fails, which can be:
-//     * apierror.ErrorResponse with codes like:
-//       - "not_found" if the content item doesn't exist
-//       - "unauthorized" if authentication fails
-//       - "forbidden" if the caller lacks permissions
-//       - "network_error" if the connection fails
+//   - apierror.ErrorResponse with codes like:
+//   - "not_found" if the content item doesn't exist
+//   - "unauthorized" if authentication fails
+//   - "forbidden" if the caller lacks permissions
+//   - "network_error" if the connection fails
 func (c *Client) GetContentItem(ctx context.Context, id string) (*ContentItem, error) {
 	path := fmt.Sprintf("/content/%s", id)
 	httpReq, err := c.newRequest(ctx, "GET", path, nil)
@@ -500,11 +500,11 @@ func (c *Client) GetContentItem(ctx context.Context, id string) (*ContentItem, e
 // Returns:
 //   - *ListContentResponse: A list of content items and optional pagination token
 //   - error: An error if the operation fails, which can be:
-//     * apierror.ErrorResponse with codes like:
-//       - "bad_request" if the query parameters are invalid
-//       - "unauthorized" if authentication fails
-//       - "forbidden" if the caller lacks permissions
-//       - "network_error" if the connection fails
+//   - apierror.ErrorResponse with codes like:
+//   - "bad_request" if the query parameters are invalid
+//   - "unauthorized" if authentication fails
+//   - "forbidden" if the caller lacks permissions
+//   - "network_error" if the connection fails
 func (c *Client) ListContentItems(ctx context.Context, statusFilter *string, sourceTypeFilter *string, limit *int, nextToken *string) (*ListContentResponse, error) {
 	httpReq, err := c.newRequest(ctx, "GET", "/content", nil)
 	if err != nil {
@@ -545,14 +545,14 @@ func (c *Client) ListContentItems(ctx context.Context, statusFilter *string, sou
 // Returns:
 //   - *DownloadURLResponse: Contains the pre-signed download URL if successful
 //   - error: An error if the operation fails, which can be:
-//     * apierror.ErrorResponse with codes like:
-//       - "not_found" if the content doesn't exist
-//       - "unauthorized" if authentication fails
-//       - "forbidden" if the caller lacks permissions
-//       - "network_error" if the connection fails
+//   - apierror.ErrorResponse with codes like:
+//   - "not_found" if the content doesn't exist
+//   - "unauthorized" if authentication fails
+//   - "forbidden" if the caller lacks permissions
+//   - "network_error" if the connection fails
 func (c *Client) GetContentDownloadURL(ctx context.Context, contentID string) (*DownloadURLResponse, error) {
 	path := fmt.Sprintf("/content/%s/download-url", contentID)
-	
+
 	req, err := c.newRequest(ctx, "GET", path, nil)
 	if err != nil {
 		return nil, err
@@ -577,12 +577,12 @@ func (c *Client) GetContentDownloadURL(ctx context.Context, contentID string) (*
 // Returns:
 //   - *ContentItem: The updated content item if successful
 //   - error: An error if the operation fails, which can be:
-//     * apierror.ErrorResponse with codes like:
-//       - "not_found" if the content item doesn't exist
-//       - "bad_request" if the request is invalid
-//       - "unauthorized" if authentication fails
-//       - "forbidden" if the caller lacks permissions
-//       - "network_error" if the connection fails
+//   - apierror.ErrorResponse with codes like:
+//   - "not_found" if the content item doesn't exist
+//   - "bad_request" if the request is invalid
+//   - "unauthorized" if authentication fails
+//   - "forbidden" if the caller lacks permissions
+//   - "network_error" if the connection fails
 func (c *Client) UpdateContentItem(ctx context.Context, id string, req *UpdateContentItemRequest) (*ContentItem, error) {
 	path := fmt.Sprintf("/content/%s", id)
 	httpReq, err := c.newRequest(ctx, "PATCH", path, req)
@@ -607,11 +607,11 @@ func (c *Client) UpdateContentItem(ctx context.Context, id string, req *UpdateCo
 //
 // Returns:
 //   - error: An error if the operation fails, which can be:
-//     * apierror.ErrorResponse with codes like:
-//       - "not_found" if the content item doesn't exist
-//       - "unauthorized" if authentication fails
-//       - "forbidden" if the caller lacks permissions
-//       - "network_error" if the connection fails
+//   - apierror.ErrorResponse with codes like:
+//   - "not_found" if the content item doesn't exist
+//   - "unauthorized" if authentication fails
+//   - "forbidden" if the caller lacks permissions
+//   - "network_error" if the connection fails
 func (c *Client) DeleteContentItem(ctx context.Context, id string) error {
 	path := fmt.Sprintf("/content/%s", id)
 	httpReq, err := c.newRequest(ctx, "DELETE", path, nil)
@@ -632,12 +632,12 @@ func (c *Client) DeleteContentItem(ctx context.Context, id string) error {
 // Returns:
 //   - *GetTextContentResponse: Contains the raw text content if successful
 //   - error: An error if the operation fails, which can be:
-//     * apierror.ErrorResponse with codes like:
-//       - "not_found" if the content item doesn't exist
-//       - "bad_request" if the content item is not of type TEXT
-//       - "unauthorized" if authentication fails
-//       - "forbidden" if the caller lacks permissions
-//       - "network_error" if the connection fails
+//   - apierror.ErrorResponse with codes like:
+//   - "not_found" if the content item doesn't exist
+//   - "bad_request" if the content item is not of type TEXT
+//   - "unauthorized" if authentication fails
+//   - "forbidden" if the caller lacks permissions
+//   - "network_error" if the connection fails
 func (c *Client) GetTextContent(ctx context.Context, id string) (*GetTextContentResponse, error) {
 	path := fmt.Sprintf("/content/%s/text", id)
 	httpReq, err := c.newRequest(ctx, "GET", path, nil)
@@ -663,12 +663,12 @@ func (c *Client) GetTextContent(ctx context.Context, id string) (*GetTextContent
 //
 // Returns:
 //   - error: An error if the operation fails, which can be:
-//     * apierror.ErrorResponse with codes like:
-//       - "not_found" if the content item doesn't exist
-//       - "bad_request" if the content item is not of type TEXT
-//       - "unauthorized" if authentication fails
-//       - "forbidden" if the caller lacks permissions
-//       - "network_error" if the connection fails
+//   - apierror.ErrorResponse with codes like:
+//   - "not_found" if the content item doesn't exist
+//   - "bad_request" if the content item is not of type TEXT
+//   - "unauthorized" if authentication fails
+//   - "forbidden" if the caller lacks permissions
+//   - "network_error" if the connection fails
 func (c *Client) UpdateTextContent(ctx context.Context, id string, req *UpdateTextContentRequest) error {
 	path := fmt.Sprintf("/content/%s/text", id)
 	httpReq, err := c.newRequest(ctx, "PUT", path, req)
@@ -678,4 +678,4 @@ func (c *Client) UpdateTextContent(ctx context.Context, id string, req *UpdateTe
 
 	_, err = c.do(httpReq, nil)
 	return err
-} 
+}

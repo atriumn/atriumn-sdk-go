@@ -107,4 +107,4 @@ func getContentType(filename string) string {
 		// Default to binary data if we can't determine the type
 		return "application/octet-stream"
 	}
-} 
+}

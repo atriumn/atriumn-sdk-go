@@ -261,25 +261,25 @@ func (c *Client) ListPrompts(ctx context.Context, options *ListPromptsOptions) (
 	// Add query parameters if options are provided
 	if options != nil {
 		q := req.URL.Query()
-		
+
 		if options.ModelID != "" {
 			q.Set("modelId", options.ModelID)
 		}
-		
+
 		if len(options.Tags) > 0 {
 			for _, tag := range options.Tags {
 				q.Add("tags", tag)
 			}
 		}
-		
+
 		if options.MaxResults > 0 {
 			q.Set("maxResults", strconv.Itoa(options.MaxResults))
 		}
-		
+
 		if options.NextToken != "" {
 			q.Set("nextToken", options.NextToken)
 		}
-		
+
 		// Set the updated query parameters
 		req.URL.RawQuery = q.Encode()
 	}
@@ -291,4 +291,4 @@ func (c *Client) ListPrompts(ctx context.Context, options *ListPromptsOptions) (
 	}
 
 	return resp.Prompts, resp.NextToken, nil
-} 
+}

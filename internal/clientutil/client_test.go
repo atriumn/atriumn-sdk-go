@@ -86,11 +86,11 @@ func TestExecuteRequest_NetworkErrors(t *testing.T) {
 
 func TestExecuteRequest_ResponseErrors(t *testing.T) {
 	tests := []struct {
-		name        string
-		statusCode  int
+		name         string
+		statusCode   int
 		responseBody string
-		wantCode    string
-		wantContain string
+		wantCode     string
+		wantContain  string
 	}{
 		{
 			name:         "custom error response",
@@ -192,9 +192,15 @@ func TestExecuteRequest_SuccessResponse(t *testing.T) {
 			name:         "parse json response",
 			statusCode:   200,
 			responseBody: `{"name":"test","value":123}`,
-			resultPtr:    &struct{ Name string `json:"name"`; Value int `json:"value"` }{},
+			resultPtr: &struct {
+				Name  string `json:"name"`
+				Value int    `json:"value"`
+			}{},
 			validate: func(t *testing.T, result interface{}) {
-				res, ok := result.(*struct{ Name string `json:"name"`; Value int `json:"value"` })
+				res, ok := result.(*struct {
+					Name  string `json:"name"`
+					Value int    `json:"value"`
+				})
 				require.True(t, ok)
 				assert.Equal(t, "test", res.Name)
 				assert.Equal(t, 123, res.Value)
@@ -303,7 +309,7 @@ func (t *bodyReadErrorTransport) RoundTrip(req *http.Request) (*http.Response, e
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Replace the body with one that fails on read
 	resp.Body = &errorReader{err: errors.New("read error")}
 	return resp, nil
@@ -320,4 +326,4 @@ func (r *errorReader) Read(p []byte) (n int, err error) {
 
 func (r *errorReader) Close() error {
 	return nil
-} 
+}
