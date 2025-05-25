@@ -18,6 +18,8 @@ test-coverage: ## Run tests with coverage reporting
 	go test -coverprofile=coverage.out ./...
 	go tool cover -html=coverage.out
 
+test-all: test ## Run all tests (alias for test target)
+
 lint: ## Run linters
 	golangci-lint run ./...
 
