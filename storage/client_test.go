@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -661,11 +662,31 @@ func TestRequestValidation(t *testing.T) {
 }
 
 func TestNetworkTimeoutError(t *testing.T) {
-	client, err := NewClient("http://localhost:12345") // Non-existent server
+	// Start a server that accepts connections but never responds
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	defer func() { _ = listener.Close() }()
+
+	// Get the actual port the listener is using
+	serverURL := fmt.Sprintf("http://%s", listener.Addr().String())
+	
+	client, err := NewClient(serverURL)
 	require.NoError(t, err)
 
-	// Set a very short timeout to trigger timeout error
-	client.HTTPClient.Timeout = 1 * time.Millisecond
+	// Set a short timeout to trigger timeout error
+	client.HTTPClient.Timeout = 100 * time.Millisecond
+
+	// Start a goroutine that accepts connections but doesn't respond
+	go func() {
+		for {
+			conn, err := listener.Accept()
+			if err != nil {
+				return // Listener closed
+			}
+			// Don't close the connection - let it timeout
+			_ = conn
+		}
+	}()
 
 	_, err = client.GenerateUploadURL(context.Background(), &GenerateUploadURLRequest{
 		Filename:    "test.txt",

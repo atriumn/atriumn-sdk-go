@@ -1,0 +1,13 @@
+# 🚀 Claude implementation using centralized workflow
+name: Claude Automation
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  claude-implement:
+    uses: atriumn/atriumn-central/.github/workflows/claude-implementation.yml@main
+    with:
+      working_dir: '.'
+    secrets: inherit
