@@ -665,7 +665,7 @@ func TestNetworkTimeoutError(t *testing.T) {
 	// Start a server that accepts connections but never responds
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
-	defer listener.Close()
+	defer func() { _ = listener.Close() }()
 
 	// Get the actual port the listener is using
 	serverURL := fmt.Sprintf("http://%s", listener.Addr().String())
