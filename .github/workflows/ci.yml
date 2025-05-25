@@ -1,0 +1,25 @@
+# CI workflow using centralized workflows from atriumn-central
+name: CI
+
+on:
+  push:
+    branches: [ main, develop, 'issue-*-implementation' ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+jobs:
+  ci:
+    uses: atriumn/atriumn-central/.github/workflows/ci.yml@main
+    with:
+      working_dir: '.'
+      project_type: 'go'
+      go_version: '1.22'
+      make_test_target: 'test-all'
+      make_lint_target: 'lint'
+      skip_tests: false
+      skip_lint: false
+      enable_docker: false
+      notify_slack: true
+      slack_channel: '#ci-cd'
+    secrets: inherit
