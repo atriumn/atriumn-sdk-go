@@ -14,7 +14,7 @@ jobs:
     with:
       working_dir: '.'
       project_type: 'go'
-      go_version: '1.22'
+      go_version: '1.24'
       make_test_target: 'test-all'
       make_lint_target: 'lint'
       skip_tests: false
