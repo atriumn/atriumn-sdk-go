@@ -1,4 +1,4 @@
-.PHONY: test test-verbose lint fmt clean tag help
+.PHONY: test test-verbose test-audit lint fmt clean tag help
 
 VERSION ?= $(shell git describe --tags --abbrev=0 2>/dev/null || echo "v0.1.0")
 NEXT_VERSION ?= $(shell echo $(VERSION) | awk -F. '{$$NF = $$NF + 1;} 1' | sed 's/ /./g')
@@ -19,6 +19,9 @@ test-coverage: ## Run tests with coverage reporting
 	go tool cover -html=coverage.out
 
 test-all: test ## Run all tests (alias for test target)
+
+test-audit: ## Run test audit to find skipped/commented tests
+	go run scripts/test-audit.go .
 
 lint: ## Run linters
 	golangci-lint run ./...
