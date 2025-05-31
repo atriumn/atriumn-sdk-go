@@ -48,8 +48,12 @@ jobs:
       - name: Tag version if workflow_dispatch
         if: github.event_name == 'workflow_dispatch'
         run: |
-          git tag ${{ steps.version.outputs.version }}
-          git push origin ${{ steps.version.outputs.version }}
+          if ! git ls-remote --tags origin | grep -q "refs/tags/${{ steps.version.outputs.version }}$"; then
+            git tag ${{ steps.version.outputs.version }}
+            git push origin ${{ steps.version.outputs.version }}
+          else
+            echo "Tag ${{ steps.version.outputs.version }} already exists, skipping tag creation"
+          fi
 
       - name: Create GitHub Release
         uses: actions/create-release@v1
