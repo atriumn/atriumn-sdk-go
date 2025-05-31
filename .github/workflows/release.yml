@@ -55,6 +55,11 @@ jobs:
             echo "Tag ${{ steps.version.outputs.version }} already exists, skipping tag creation"
           fi
 
+      - name: Verify module is accessible
+        run: |
+          echo "Module should be accessible at: github.com/atriumn/atriumn-sdk-go@${{ steps.version.outputs.version }}"
+          echo "Repository is private, so consumers need GOPRIVATE=github.com/atriumn/* and authentication"
+          
       - name: Create GitHub Release
         uses: actions/create-release@v1
         env:
